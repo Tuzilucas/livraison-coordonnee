@@ -1,6 +1,19 @@
-# livraison-coordonnee — version 1.4.1
+# livraison-coordonnee
 
-Plugin Claude Code qui produit un livrable, le fait passer une **porte de qualité mécanique**, puis le fait relire par trois experts. Un livrable refusé par la porte n'est jamais noté.
+**Une commande, une livraison vérifiée.** Plugin Claude Code : il lit les règles de votre `CLAUDE.md`, écrit d'abord le test de la demande, réalise la modification, puis passe une porte de qualité (format, lint, types, données, construction, tests, navigation, affichage sur six largeurs). Un hook d'arrêt relance la porte avant toute conclusion : « terminé » n'est jamais annoncé sur un échec.
+
+_One command, one verified delivery: a Claude Code plugin that turns your `CLAUDE.md` rules into checks, writes the acceptance test first, and refuses to say "done" until the quality gate is green. Documentation in French._
+
+![Résumé de la porte de qualité : neuf vérifications vertes, « la livraison peut être acceptée »](docs/porte-verte.png)
+
+```bash
+git clone https://github.com/Tuzilucas/livraison-coordonnee ~/outils/livraison-coordonnee
+cd /chemin/vers/mon-projet && claude --plugin-dir ~/outils/livraison-coordonnee
+```
+
+Puis, dans Claude Code : `/livraison-coordonnee:livrer <votre demande>`. Notice pas à pas : [`NOTICE.md`](NOTICE.md). Licence MIT. Version 1.4.1.
+
+Validé en conditions réelles sur deux projets : une application web en un seul fichier (37 règles sur 37 contrôlées par un test) et un site Next.js de 900 pages (porte 9/9, fusion et publication).
 
 ## Utilisation
 
