@@ -1,5 +1,7 @@
 # Notice d'utilisation — plugin `livraison-coordonnee` (version 1.5.0)
 
+_[English version](NOTICE.en.md)_
+
 Plugin pour Claude Code. Une commande livre une demande en respectant les règles de votre projet, et ne la
 déclare terminée qu'après une porte de qualité réussie. Cette notice s'adresse à quelqu'un qui découvre
 le plugin : rien n'y suppose de connaître le projet d'origine.

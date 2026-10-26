@@ -1,8 +1,8 @@
 # livraison-coordonnee
 
-**Une commande, une livraison vérifiée.** Plugin Claude Code : il lit les règles de votre `CLAUDE.md`, écrit d'abord le test de la demande, réalise la modification, puis passe une porte de qualité (format, lint, types, données, construction, tests, navigation, affichage sur six largeurs). Un hook d'arrêt relance la porte avant toute conclusion : « terminé » n'est jamais annoncé sur un échec.
+_[English version](README.en.md)_
 
-_One command, one verified delivery: a Claude Code plugin that turns your `CLAUDE.md` rules into checks, writes the acceptance test first, and refuses to say "done" until the quality gate is green. Documentation in French._
+**Une commande, une livraison vérifiée.** Plugin Claude Code : il lit les règles de votre `CLAUDE.md`, écrit d'abord le test de la demande, réalise la modification, puis passe une porte de qualité (format, lint, types, données, construction, tests, navigation, affichage sur six largeurs). Un hook d'arrêt relance la porte avant toute conclusion : « terminé » n'est jamais annoncé sur un échec.
 
 ![Résumé de la porte de qualité : neuf vérifications vertes, « la livraison peut être acceptée »](docs/porte-verte.png)
 
@@ -11,17 +11,15 @@ git clone https://github.com/Tuzilucas/livraison-coordonnee ~/outils/livraison-c
 cd /chemin/vers/mon-projet && claude --plugin-dir ~/outils/livraison-coordonnee
 ```
 
-Puis, dans Claude Code : `/livraison-coordonnee:livrer <votre demande>`. Notice pas à pas : [`NOTICE.md`](NOTICE.md). Licence MIT. Version 1.5.0.
+Puis, dans Claude Code : `/livraison-coordonnee:livrer <votre demande>`. Notice pas à pas : [`NOTICE.md`](NOTICE.md). Contribuer : [`CONTRIBUTING.md`](CONTRIBUTING.md). Licence MIT. Version 1.5.0.
 
-Validé en conditions réelles sur deux projets : une application web en un seul fichier (37 règles sur 37 contrôlées par un test) et un site Next.js de 900 pages (porte 9/9, fusion et publication).
+Validé en conditions réelles sur deux projets : une application web en un seul fichier (37 règles sur 37 contrôlées par un test) et un site Next.js de 900 pages (porte 9/9, fusion et publication). Le moteur a sa propre suite de 28 tests (`npm test`).
 
 ## Utilisation
 
-    /livraison-coordonnee:livrer <description du livrable>
+    /livraison-coordonnee:livrer <description de la demande>
 
 Sans description, la commande ne lance aucun travail et demande ce qu'il faut produire.
-
-Dépôt de référence : `Tuzilucas/livraison-coordonnee`. Notice complète pour un nouvel utilisateur : `NOTICE.md`.
 
 Installation :
 
@@ -35,85 +33,53 @@ Installation :
 
 ## Fonctionnement
 
-Notice complète pour un nouvel utilisateur : `NOTICE.md` (prérequis, installation, première utilisation, porte de qualité, fichiers créés, réglages, questions fréquentes).
-
 1. **Cadrer** : lecture de `CLAUDE.md`, règles classées dans `.claude/regles-livraison.json`, choix mineurs notés dans `CHOIX.txt`.
 2. **Prouver** : un test d'acceptation étiqueté `demande:<nom>` est écrit avant la modification.
 3. **Produire** la modification.
 4. **Porte de qualité** (`scripts/gate.mjs`), entièrement mécanique : vérifications du projet, couverture des règles par des tests, données, construction, tests des règles, navigation de bout en bout, interdits, affichage à 320, 360, 390, 768, 1024 et 1440 px (thème sombre s'il est déclaré). Rapport, résumé en français et captures dans `rapport-livraison/`.
 5. **Corriger** tout échec et relancer, cinq essais au maximum.
-6. **Verdict** : le hook d'arrêt (`scripts/verdict-arret.mjs`) relance la porte avant toute conclusion ; en cas d'échec, Claude est renvoyé au travail. Journal dans `.livraison-journal.log`, reprise après coupure via `.livraison-etat.json`.
+6. **Verdict** : le hook d'arrêt (`scripts/verdict-arret.mjs`) relance la porte avant toute conclusion ; en cas d'échec, Claude est renvoyé au travail ; après épuisement des essais, la livraison est consignée « non terminée ». Journal dans `.livraison-journal.log`, reprise après coupure via `.livraison-etat.json`.
+
+Chaque contrôle a un statut : `reussi`, `echoue`, `sans_objet` (le projet n'a pas cette étape ; ne compte ni pour ni contre) ou `non_execute` (étape attendue qui n'a pas tourné ; compte comme un échec). Un projet sans aucun mécanisme de vérification n'obtient jamais de porte verte.
 
 ## Fichier de règles d'un projet
 
-`.claude/regles-livraison.json` :
-- `sections_claude_md` : sections de `CLAUDE.md` que le fichier de règles couvre (obligatoire) ;
-- `routes` : pages à contrôler ;
+`.claude/regles-livraison.json`, généré par `scripts/regles.mjs` puis complété à la main :
+
+- `sections_claude_md` : sections de `CLAUDE.md` que le fichier couvre (obligatoire) ;
+- `routes` : pages à contrôler (sinon détection automatique, deux niveaux de dossiers) ;
 - `largeurs` : largeurs d'écran (par défaut 320 à 1440 px) ;
-- `interdits` : motifs qui ne doivent apparaître dans aucun fichier construit.
+- `interdits` : motifs qui ne doivent apparaître dans aucun fichier construit ;
+- `controles`, `revue_humaine` : mots-clés qui classent une règle ;
+- `interface_web: false` : projet sans pages (contrôles d'affichage sans objet).
 
 ## Avantages
 
-- **Détecte de vrais défauts** : sur le site « Pièces à l'appui », la porte a relevé des superpositions de texte (bouton d'aide sur le pied de page, étiquettes de graphiques), des cibles tactiles trop petites, et des débordements, que la relecture seule n'avait pas vus.
-- **Refuse sans négocier** : un contrôle en échec bloque le livrable, quelle que soit la note donnée par ailleurs.
-- **Traçable** : chaque passage laisse un rapport, des journaux et des captures.
-- **Reproductible** : les mêmes contrôles tournent à chaque passage.
+- **Détecte de vrais défauts** : superpositions de texte, cibles tactiles trop petites, débordements, plantage de construction après une fusion, que la relecture seule n'avait pas vus.
+- **Refuse sans négocier** : un contrôle en échec bloque la livraison ; un rapport absent, un plantage ou une valeur d'environnement ne peuvent pas la transformer en succès.
+- **Traçable** : chaque passage laisse un rapport, un résumé en français, des journaux et des captures.
+- **Reproductible** : les mêmes contrôles tournent à chaque passage, et le moteur est lui-même testé.
 
 ## Inconvénients
 
-- **Plus lent** : sur le test du site, 1 440 s avec plugin contre 789 s sans. Environ deux fois plus long, et plus de jetons consommés.
-- **Ne juge pas le goût** : le design, le ton et la pertinence des textes restent des avis subjectifs des experts.
-- **Ne vérifie pas la compréhension des règles** : la porte contrôle la couverture des sections de `CLAUDE.md`, pas que chaque règle est bien appliquée partout.
-- **Dépend de l'environnement** : les contrôles d'affichage demandent Playwright et Chromium. Les experts n'exécutent rien : ils s'appuient sur les preuves écrites par la porte.
-- **Faux positifs possibles** : plusieurs ont été corrigés pendant la mise au point (contenu replié, texte pour lecteurs d'écran, animations). D'autres peuvent apparaître sur des sites différents.
-- **Le test porte sur un seul projet.** Rien ne prouve encore qu'il fasse mieux qu'un bon travail direct sur d'autres livrables.
+- **Plus lent** : une livraison prend 15 à 40 minutes, construction et tests compris, et consomme plus de jetons.
+- **Ne juge pas le goût** : le design, le ton et la pertinence des textes ne sont pas mesurés.
+- **Ne vérifie pas la compréhension des règles** : la porte contrôle qu'un test couvre chaque règle, pas que la règle est bien appliquée partout.
+- **Dépend de l'environnement** : les contrôles d'affichage demandent Playwright et Chromium.
+- **Faux positifs possibles** : plusieurs ont été corrigés (contenu replié, texte pour lecteurs d'écran, animations, icône d'onglet absente). D'autres peuvent apparaître sur des sites différents.
 
 ## Quand l'utiliser
 
-**Oui**, quand la fiabilité compte plus que la vitesse :
-- un site ou une application publique, qui doit fonctionner sur tous les écrans ;
-- une livraison qui doit respecter des règles écrites (sources, neutralité, données) ;
-- un livrable qu'on ne pourra pas corriger rapidement après publication.
+**Oui**, quand la fiabilité compte plus que la vitesse : un site ou une application publique, une livraison qui doit respecter des règles écrites, un livrable difficile à corriger après publication.
 
-**Non**, pour :
-- un prototype ou une idée à tester vite ;
-- une modification mineure d'un texte ou d'une couleur ;
-- un projet sans tests ni construction : la porte ne peut rien vérifier.
-
-**Ordre d'usage recommandé** : écrire d'abord, lancer la porte, corriger, puis n'appeler les experts que sur un livrable qui passe la porte.
-
-## Résultats du test (site « Pièces à l'appui »)
-
-| | Avec plugin | Sans plugin |
-|---|---|---|
-| Durée | 1 440 s | 789 s |
-| Fichiers modifiés | 7 | 2 |
-| Porte de qualité | 10/10 après 3 passages de correction | non mesurée |
-| Tests de bout en bout | 29 réussis | 28 réussis |
+**Non**, pour un prototype, une modification mineure, ou un projet sans tests ni construction : la porte ne pourrait rien prouver, et elle le dira.
 
 ## Limites connues
 
-- Les notes des experts restent subjectives. Ce qui est vérifié mécaniquement : la présence des preuves, les lignes citées, le seuil de 9,5 (`scripts/verifier-notes.mjs`).
-- Le retour utilisateur est simulé : il ne remplace pas des personnes qui testent.
-- Pour un module métier (base de données, MES), il faut des tests de base de données, comme ceux du module d'exemple.
-- Le plugin n'est pas encore publié dans un annuaire : il manque une licence et une icône.
-
-## Équipe (version 0.4.0)
-
-- **Porte de qualité** (mécanique) : fonctionnement, règles du projet, affichage à six largeurs, contraste des textes.
-- **Sept experts**, lancés après une porte réussie : `expert-code`, `expert-ergonomie`, `expert-visuel`, `expert-design`, `expert-securite`, `expert-vulgarisation`, `expert-retour-utilisateur`.
-- **Arbitre** `arbitre-equilibre` : tranche les désaccords entre experts selon un ordre fixe (règles du projet, sécurité, mesure de la porte, puis le moins de pages touchées). Il ne note pas et ne peut pas abaisser un seuil.
-- **Pas de shell pour les experts** (depuis 0.6.0) : leurs outils sont Read, Grep et Glob. Une note sans preuve vaut zéro (`scripts/verifier-notes.mjs`).
-
-Ce qui a été corrigé depuis la version 0.3.0 : permissions explicites pour les commandes de contrôle des experts ; contrôle du contraste ajouté à la porte ; rapport de couverture (nombre de zones de texte mesurées) ; arbitrage des désaccords défini.
-
-## Vitesse et modes de la porte (version 0.5.0)
-
-- **Mode rapide** (`--rapide`) : pendant les corrections. Largeurs réduites (320, 390, 1024 px) et build réutilisé si le code n'a pas changé. Mesuré : **90 s**.
-- **Mode final** (défaut) : toutes les largeurs (320 à 1440 px), build complet. Mesuré : **220 s**. C'est la seule porte qui compte pour accepter le livrable.
-- **Vérification de l'environnement** (`verifier-environnement.mjs`) : dit ce qui manque (Node, Playwright, Chromium, fichiers du projet) avant de lancer une livraison.
-
-Aucune garantie n'est perdue : le mode rapide sert seulement à corriger plus vite ; la porte finale reconstruit tout.
+- Les tests écrits par le plugin doivent être relus au début : un test trop faible donne un faux vert.
+- Les pages sont détectées jusqu'à deux niveaux de dossiers ; au-delà, les lister dans `routes`.
+- Le contraste n'est mesuré que sur fond de couleur unie ; les textes sur image sont comptés « non mesurables », jamais validés.
+- L'installation par la place de marché Claude Code suit le format documenté mais n'a pas encore été essayée sur un poste.
 
 ## Versions
 
@@ -138,6 +104,4 @@ Aucune garantie n'est perdue : le mode rapide sert seulement à corriger plus vi
 - 0.2.0 : grille et chemins corrigés, outils autorisés, contrôle objectif, deux passages au maximum.
 - 0.1.0 : premier prototype, trois experts, grille de notation.
 
-## Journal et marqueur (0.8.4)
-- Une livraison en cours est marquée par `.livraison-en-cours` à la racine du projet ; la commande le crée, le hook le retire à la fin.
-- Chaque décision du hook est écrite dans `.livraison-journal.log` (heure, tentative, échecs). Ces deux fichiers sont ignorés par Git.
+Les dossiers `agents/`, `grille/` et `scripts/verifier-notes.mjs` datent des versions 0.x (relecture par experts notés) ; ils ne font plus partie du procédé depuis la 0.8.0 et sont conservés pour mémoire.
