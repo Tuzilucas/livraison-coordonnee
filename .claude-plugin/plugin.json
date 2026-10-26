@@ -1,0 +1,8 @@
+{
+  "name": "livraison-coordonnee",
+  "description": "Produit un livrable, convertit CLAUDE.md en contrôles, et bloque la fin tant que la porte de qualité échoue. Navigateur MCP adapté à l'appareil (Chrome ou Edge).",
+  "version": "1.4.1",
+  "author": {
+    "name": "Lucas Tuzi"
+  }
+}

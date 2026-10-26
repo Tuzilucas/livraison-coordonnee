@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "navigateur": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/lancer-navigateur.mjs"]
+    }
+  }
+}

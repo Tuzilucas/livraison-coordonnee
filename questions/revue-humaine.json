@@ -1,0 +1,66 @@
+[
+  {
+    "id": "deploiement",
+    "titre": "Mise en ligne",
+    "question": "Après une fusion dans main, le site part en ligne tout de suite. Qui vérifie que la mise en ligne a bien marché ?",
+    "motifs": ["Une fusion dans `main`", "Après fusion"]
+  },
+  {
+    "id": "pub-pistage",
+    "titre": "Publicité et pistage",
+    "question": "L'application doit rester gratuite, sans publicité, sans traceur. Qui surveille ça à chaque changement ?",
+    "motifs": ["Gratuit, sans publicité"]
+  },
+  {
+    "id": "principes",
+    "titre": "Principes du produit",
+    "question": "Les principes du produit (simplicité, partage rapide, vente du projet, nom, positionnement) : qui les vérifie ?",
+    "motifs": [
+      "Simplicité avant tout",
+      "Croissance",
+      "Objectif de cession",
+      "Nom : BattleVote",
+      "Positionnement"
+    ]
+  },
+  {
+    "id": "description",
+    "titre": "Description du projet",
+    "question": "Les descriptions du projet (architecture, backend, objectif Google Play, fichiers de documentation) : qui vérifie qu'elles restent exactes ?",
+    "motifs": [
+      "App web statique",
+      "Backend : Supabase",
+      "Objectif : publication",
+      "Détails : `docs/ARCHITECTURE"
+    ]
+  },
+  {
+    "id": "plan",
+    "titre": "Plan avant une modification",
+    "question": "Avant une modification importante, Claude doit expliquer son plan. Qui vérifie que ça a été fait ?",
+    "motifs": ["Avant toute modification importante"]
+  },
+  {
+    "id": "conventions-code",
+    "titre": "Conventions de code",
+    "question": "Les conventions de code de index.html (navigation, échappement des textes, styles, document PDF) : qui les contrôle ?",
+    "motifs": [
+      "Naviguer par nom de fonction",
+      "Toute valeur utilisateur",
+      "Styles : réutiliser",
+      "second document HTML"
+    ]
+  },
+  {
+    "id": "legal",
+    "titre": "Obligations légales",
+    "question": "Licence, bibliothèques tierces, données collectées, contact officiel : qui s'assure que les mentions légales suivent ?",
+    "motifs": ["Code propriétaire", "Nouvelle bibliothèque", "Nouvelle donnée collectée", "Contact officiel"]
+  },
+  {
+    "id": "competences",
+    "titre": "Compétences du projet",
+    "question": "Les compétences du projet (vérifier, modifier l'application, migrations, publication, structure) : qui vérifie qu'elles existent et restent à jour ?",
+    "motifs": ["^`(verify|edit-app|supabase-migration|release|feed-structure)`"]
+  }
+]
