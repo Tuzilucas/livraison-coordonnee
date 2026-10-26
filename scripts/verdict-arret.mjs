@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 // Hook « Stop » : tant qu'une livraison est en cours (marqueur .livraison-en-cours à la racine), Claude ne peut pas
 // s'arrêter sur « fini » sans que la porte finale passe. Si elle échoue, le hook renvoie Claude au travail.
-// Après ESSAIS_MAX échecs (5 par défaut), le marqueur est retiré et l'arrêt est autorisé, avec une mention
-// persistante « NON terminée » dans .livraison-etat.json, le journal et un message système.
+// Après ESSAIS_MAX échecs (5 par défaut), ou trois essais de suite avec exactement les mêmes échecs pendant une
+// continuation (stop_hook_active), le marqueur est retiré et l'arrêt est autorisé, avec une mention persistante
+// « NON terminée » dans .livraison-etat.json, le journal et un message système.
+// Claude Code plafonne lui-même à huit continuations consécutives sans appel d'outil (CLAUDE_CODE_STOP_HOOK_BLOCK_CAP).
 import { spawnSync } from "node:child_process";
 import { appendFileSync, existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { decider, lireRapport, lireTentatives } from "./verdict.mjs";
+import { langueDe, t } from "./langue.mjs";
+import { decider, lireMarqueur, lireRapport } from "./verdict.mjs";
 
 // Journal du verdict : une ligne horodatée par décision, à la racine du projet (ignoré par Git).
 const journal = (projet, texte) => {
@@ -22,10 +25,15 @@ try {
   entree = JSON.parse(readFileSync(0, "utf8") || "{}");
 } catch {}
 const projet = entree.cwd ?? process.cwd();
+const stopHookActive = entree.stop_hook_active === true;
 // Marqueur à la racine du projet (pas dans .claude/, protégé par l'environnement).
-const marqueur = join(projet, ".livraison-en-cours");
-if (!existsSync(marqueur)) process.exit(0);
-journal(projet, `verdict : début, marqueur présent (${marqueur})`);
+const marqueurFichier = join(projet, ".livraison-en-cours");
+if (!existsSync(marqueurFichier)) process.exit(0);
+const langue = langueDe(projet);
+journal(
+  projet,
+  `verdict : début, marqueur présent (${marqueurFichier})${stopHookActive ? ", continuation déjà en cours (stop_hook_active)" : ""}`,
+);
 
 const gate = join(import.meta.dirname, "gate.mjs");
 const r = spawnSync(process.execPath, [gate, projet], {
@@ -38,34 +46,36 @@ if (r.error) journal(projet, `verdict : la porte n'a pas pu être exécutée (${
 
 const fichierRapport = join(projet, "rapport-livraison", "rapport.json");
 const rapport = lireRapport(existsSync(fichierRapport) ? readFileSync(fichierRapport, "utf8") : null);
-const tentativesPrecedentes = lireTentatives(existsSync(marqueur) ? readFileSync(marqueur, "utf8") : "0");
+const marqueur = lireMarqueur(existsSync(marqueurFichier) ? readFileSync(marqueurFichier, "utf8") : "");
 const verdict = decider({
   codeGate: r.status,
   rapport,
-  tentativesPrecedentes,
+  marqueur,
   essaisMax: process.env.LIVRAISON_ESSAIS,
+  stopHookActive,
 });
 
 if (verdict.decision === "terminee") {
-  unlinkSync(marqueur);
+  unlinkSync(marqueurFichier);
   journal(projet, "verdict : porte finale réussie, marqueur retiré, arrêt autorisé");
-  console.error("Livraison terminée : la porte finale passe.");
+  console.error(t(langue, "hook_terminee"));
   process.exit(0);
 }
 
 const echecs = rapport.controles.filter((c) => !c.ok).map((c) => `${c.nom} : ${c.detail}`);
 if (rapport.invalide) echecs.unshift(`rapport de la porte : ${rapport.invalide}`);
-// Résumé en français écrit par la porte ; à défaut, la liste technique.
+// Résumé écrit par la porte (dans la langue du projet) ; à défaut, la liste technique.
 const fichierResume = join(projet, "rapport-livraison", "RESUME.txt");
-const resumeFr =
+const resume =
   !rapport.invalide && existsSync(fichierResume) ? readFileSync(fichierResume, "utf8") : echecs.join("\n");
 journal(
   projet,
-  `verdict : porte finale échouée (${verdict.raisonCode}), tentative ${verdict.tentatives}/${verdict.essaisMax}`,
+  `verdict : porte finale échouée (${verdict.raisonCode}), tentative ${verdict.tentatives}/${verdict.essaisMax}` +
+    (verdict.sansProgres ? `, sans progrès ×${verdict.sansProgres}` : ""),
 );
 
 if (verdict.decision === "abandon") {
-  unlinkSync(marqueur);
+  unlinkSync(marqueurFichier);
   // État persistant : la livraison n'est PAS terminée. Une reprise (commande relancée) le lit en premier.
   writeFileSync(
     join(projet, ".livraison-etat.json"),
@@ -74,6 +84,7 @@ if (verdict.decision === "abandon") {
         date: new Date().toISOString(),
         terminee: false,
         abandon: true,
+        sans_progres: Boolean(verdict.sansProgresAtteint),
         essais: verdict.tentatives,
         controles_echoues: rapport.controles.filter((c) => !c.ok).map((c) => c.nom),
         rapport_invalide: rapport.invalide ?? null,
@@ -84,15 +95,26 @@ if (verdict.decision === "abandon") {
   );
   journal(
     projet,
-    `verdict : ${verdict.essaisMax} tentatives épuisées, marqueur retiré, livraison NON terminée`,
+    verdict.sansProgresAtteint
+      ? `verdict : mêmes échecs ${verdict.sansProgres} fois de suite, marqueur retiré, livraison NON terminée`
+      : `verdict : ${verdict.essaisMax} tentatives épuisées, marqueur retiré, livraison NON terminée`,
   );
-  const message = `LIVRAISON NON TERMINÉE après ${verdict.essaisMax} essais. La porte de qualité échoue encore :\n${resumeFr}`;
+  const message = verdict.sansProgresAtteint
+    ? t(langue, "hook_sans_progres", { n: verdict.sansProgres, resume })
+    : t(langue, "hook_abandon", { n: verdict.essaisMax, resume });
   console.error(message);
   console.log(JSON.stringify({ systemMessage: message }));
   process.exit(0);
 }
 
-writeFileSync(marqueur, String(verdict.tentatives));
+writeFileSync(
+  marqueurFichier,
+  JSON.stringify({
+    tentatives: verdict.tentatives,
+    sans_progres: verdict.sansProgres,
+    empreinte: verdict.empreinte,
+  }),
+);
 journal(
   projet,
   `verdict : blocage renvoyé à Claude ; échecs : ${echecs.join(" ; ") || "aucun détail dans le rapport"}`,
@@ -100,6 +122,6 @@ journal(
 console.log(
   JSON.stringify({
     decision: "block",
-    reason: `La livraison n'est pas encore acceptée (essai ${verdict.tentatives} sur ${verdict.essaisMax}). Voici ce qui reste à faire :\n\n${resumeFr}\n\nCorrige ces points, relance la vérification, et n'annonce la livraison qu'une fois tout en vert.`,
+    reason: t(langue, "hook_bloquer", { n: verdict.tentatives, max: verdict.essaisMax, resume }),
   }),
 );

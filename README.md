@@ -11,7 +11,7 @@ git clone https://github.com/Tuzilucas/livraison-coordonnee ~/outils/livraison-c
 cd /chemin/vers/mon-projet && claude --plugin-dir ~/outils/livraison-coordonnee
 ```
 
-Puis, dans Claude Code : `/livraison-coordonnee:livrer <votre demande>`. Notice pas à pas : [`NOTICE.md`](NOTICE.md). Contribuer : [`CONTRIBUTING.md`](CONTRIBUTING.md). Licence MIT. Version 1.5.0.
+Puis, dans Claude Code : `/livraison-coordonnee:livrer <votre demande>`. Notice pas à pas : [`NOTICE.md`](NOTICE.md). Contribuer : [`CONTRIBUTING.md`](CONTRIBUTING.md). Licence MIT. Version 1.6.0.
 
 Validé en conditions réelles sur deux projets : une application web en un seul fichier (37 règles sur 37 contrôlées par un test) et un site Next.js de 900 pages (porte 9/9, fusion et publication). Le moteur a sa propre suite de 28 tests (`npm test`).
 
@@ -41,6 +41,10 @@ Installation :
 6. **Verdict** : le hook d'arrêt (`scripts/verdict-arret.mjs`) relance la porte avant toute conclusion ; en cas d'échec, Claude est renvoyé au travail ; après épuisement des essais, la livraison est consignée « non terminée ». Journal dans `.livraison-journal.log`, reprise après coupure via `.livraison-etat.json`.
 
 Chaque contrôle a un statut : `reussi`, `echoue`, `sans_objet` (le projet n'a pas cette étape ; ne compte ni pour ni contre) ou `non_execute` (étape attendue qui n'a pas tourné ; compte comme un échec). Un projet sans aucun mécanisme de vérification n'obtient jamais de porte verte.
+
+## Langues
+
+Le code, les noms de contrôles et le rapport technique sont en français. Les résumés (`RESUME.txt`) et les messages du hook existent en **français, anglais, espagnol, allemand et italien**. Choix : variable `LIVRAISON_LANGUE`, sinon `"langue"` dans `.claude/regles-livraison.json` (posée par `scripts/regles.mjs --langue=xx`), sinon français. La commande `/livraison-coordonnee:deliver` est l'équivalent anglais de `livrer` : elle enregistre l'anglais pour le projet. La demande elle-même peut être écrite dans n'importe quelle langue.
 
 ## Fichier de règles d'un projet
 
@@ -83,6 +87,7 @@ Chaque contrôle a un statut : `reussi`, `echoue`, `sans_objet` (le projet n'a p
 
 ## Versions
 
+- 1.6.0 : résumés et messages en cinq langues (fr, en, es, de, it ; `LIVRAISON_LANGUE`, `--langue=xx`, `langue` du fichier de règles) ; commande anglaise `/livraison-coordonnee:deliver`. Hook d'arrêt aligné sur la documentation Claude Code : lecture de `stop_hook_active`, abandon anticipé quand les mêmes échecs reviennent trois fois de suite pendant une continuation (plafond Claude Code de huit continuations consécutives sans appel d'outil, `CLAUDE_CODE_STOP_HOOK_BLOCK_CAP`), marqueur au format JSON (tentatives, sans progrès, empreinte des échecs ; ancien format numérique accepté). 37 tests.
 - 1.5.0 : audit technique. Serveur de contrôle confiné au dossier construit (chemins résolus réellement, liens symboliques et encodages refusés), interface locale et port libre choisi par le système. Statuts explicites des contrôles : « reussi », « echoue », « sans_objet » (ne compte pas dans la fiabilité) et « non_execute » (compte comme un échec) ; un projet sans aucun mécanisme de vérification n'obtient jamais de porte verte ; pendant une livraison, le test d'acceptation doit être exécuté par un script (`test:regles`, `check` ou `test`), pas seulement présent ; `interface_web: false` déclare un projet sans pages. Lecture sûre des JSON (règles, `package.json`), motifs interdits invalides diagnostiqués, plantage interne de la porte converti en rapport d'échec. Verrou contre deux portes simultanées. Navigateur toujours fermé, même sur exception. Mode rapide : le build est refait si une dépendance, un lockfile, une configuration ou un `.env` a changé. Hook d'arrêt : `LIVRAISON_ESSAIS` borné (1 à 50), marqueur illisible toléré, rapport absent ou malformé traité comme un échec, abandon après épuisement consigné dans `.livraison-etat.json` (`terminee: false`) et signalé par un message système. Faux positifs corrigés : icône d'onglet absente, dossier de tests non suivi par Git. Suite de tests du moteur sur projets temporaires (`npm test`, 28 tests).
 - 1.4.1 : contrôle d'affichage : un résumé imbriqué dans un bloc replié n'est plus compté comme visible (faux positifs de chevauchement sur des `details` imbriqués). Validé en conditions réelles sur BattleVote (37/37 règles testées, version 1.14.0 en production) et sur Pièces à l'appui (porte 9/9, fusion et publication).
 - 1.4.0 : une seule commande pour une demande : test d'acceptation écrit d'abord (exigé par la porte pendant une livraison), choix mineurs notés dans CHOIX.txt, cinq essais au lieu de trois.

@@ -6,6 +6,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { resumeEnFrancais } from "./resume.mjs";
 import { demarrer } from "./serveur.mjs";
+import { langueDe, normaliser } from "./langue.mjs";
 import { createRequire } from "node:module";
 import { extname, join, resolve } from "node:path";
 
@@ -14,6 +15,9 @@ import { extname, join, resolve } from "node:path";
 const args = process.argv.slice(2);
 const rapide = args.includes("--rapide");
 const projet = resolve(args.find((a) => !a.startsWith("--")) ?? ".");
+// Langue des résumés : --langue=xx > LIVRAISON_LANGUE > « langue » du fichier de règles > fr.
+const langueArg = normaliser((args.find((a) => a.startsWith("--langue=")) ?? "").slice(9));
+const langue = langueArg ?? langueDe(projet);
 // Fichiers temporaires du plugin : ignorés par Git dans le projet (ajoutés une fois, sans toucher au reste).
 const entreesIgnorees = [
   ".livraison-en-cours",
@@ -126,7 +130,7 @@ function conclure(erreurInterne) {
       2,
     ) + "\n",
   );
-  const resume = resumeEnFrancais(controles);
+  const resume = resumeEnFrancais(controles, langue);
   writeFileSync(join(rapportDir, "RESUME.txt"), resume + "\n");
   console.log("\n" + resume + "\n");
   process.exit(reussi ? 0 : 1);

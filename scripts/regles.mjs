@@ -9,7 +9,14 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-const projet = resolve(process.argv[2] ?? ".");
+const argsRegles = process.argv.slice(2);
+const projet = resolve(argsRegles.find((a) => !a.startsWith("--")) ?? ".");
+// Langue des résumés et messages (fr, en, es, de, it), conservée dans le fichier de règles : --langue=xx la change.
+const langueArg = (argsRegles.find((a) => a.startsWith("--langue=")) ?? "")
+  .slice(9)
+  .trim()
+  .toLowerCase()
+  .slice(0, 2);
 const texte = readFileSync(join(projet, "CLAUDE.md"), "utf8");
 // Configuration propre au projet, conservée dans .claude/regles-livraison.json :
 //   controles : [{ id, motif, bloquant? }] ajoutés avant les contrôles génériques (motif = expression régulière) ;
@@ -157,6 +164,7 @@ const sortie = {
   genere_par: "livraison-coordonnee/scripts/regles.mjs",
   source_sha256: createHash("sha256").update(texte).digest("hex"),
   sections_claude_md: titresDeSections,
+  langue: ["fr", "en", "es", "de", "it"].includes(langueArg) ? langueArg : (ancien.langue ?? "fr"),
   controles: ancien.controles ?? [],
   revue_humaine: ancien.revue_humaine ?? [],
   routes: ancien.routes ?? ["/"],

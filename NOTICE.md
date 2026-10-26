@@ -1,4 +1,4 @@
-# Notice d'utilisation — plugin `livraison-coordonnee` (version 1.5.0)
+# Notice d'utilisation — plugin `livraison-coordonnee` (version 1.6.0)
 
 _[English version](NOTICE.en.md)_
 
@@ -126,6 +126,7 @@ Les fichiers « Non » sont ajoutés automatiquement au `.gitignore` du projet.
 | ------------------------ | --------------------------- | ----------------------------------------------- |
 | `LIVRAISON_ESSAIS`       | `5`                         | Nombre d'essais de correction avant abandon (1 à 50). |
 | `LIVRAISON_NAVIGATEUR`   | Chrome, puis Edge           | Forcer `chrome` ou `msedge` pour les captures.  |
+| `LIVRAISON_LANGUE`       | `fr`                        | Langue des résumés et messages : `fr`, `en`, `es`, `de`, `it`. Sinon `"langue"` du fichier de règles (`regles.mjs --langue=xx`). |
 
 Options de `.claude/regles-livraison.json` : `routes` (pages à contrôler), `largeurs`, `interdits`,
 `controles` et `revue_humaine` (mots-clés qui classent une règle), `theme_sombre`.
@@ -144,6 +145,11 @@ porte. Le résumé indique quel contrôle l'a motivée. Si le contrôle est trop
 
 **Un test d'acceptation me paraît faible.** Le relire et le renforcer : un test trop faible donne un faux
 vert. C'est la principale limite connue.
+
+**La porte tourne en rond.** Si, pendant une continuation (Claude Code signale `stop_hook_active`), les mêmes
+échecs reviennent trois fois de suite, le hook abandonne sans attendre le cinquième essai, avec la mention
+« sans progrès ». Claude Code plafonne lui-même à huit continuations consécutives sans appel d'outil
+(`CLAUDE_CODE_STOP_HOOK_BLOCK_CAP`).
 
 **Les essais sont épuisés, que se passe-t-il ?** Le marqueur est retiré pour que Claude puisse s'arrêter,
 mais la livraison est consignée comme **non terminée** : `.livraison-etat.json` contient `"terminee": false`,
@@ -171,7 +177,7 @@ hook d'arrêt ne relancera plus la porte.
 
 ## 11. Tester le plugin lui-même
 
-`npm test` dans le dossier du plugin lance 28 tests sur des projets temporaires (créés dans le dossier
+`npm test` dans le dossier du plugin lance 37 tests sur des projets temporaires (créés dans le dossier
 temporaire du système, supprimés ensuite) : projet valide, test ou build en échec, erreur JavaScript,
 configuration invalide, `package.json` absent ou malformé, deux portes simultanées, traversée de
 répertoires, rapports absents ou corrompus, épuisement des essais, projet sans tests, build périmé en mode

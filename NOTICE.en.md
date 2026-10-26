@@ -1,4 +1,4 @@
-# User guide — `livraison-coordonnee` plugin (version 1.5.0)
+# User guide — `livraison-coordonnee` plugin (version 1.6.0)
 
 _Translation of [`NOTICE.md`](NOTICE.md); the French version is authoritative._
 
@@ -50,7 +50,7 @@ In the conversation:
 /livraison-coordonnee:livrer Add an "Export to CSV" button on the orders page
 ```
 
-Without a description, the command does nothing and asks what to produce. The request can be written in any language; the plugin's own messages and summaries are in French.
+Without a description, the command does nothing and asks what to produce. The request can be written in any language. Use `/livraison-coordonnee:deliver` to get summaries and hook messages in English (`livrer` keeps French); other languages: `LIVRAISON_LANGUE=es|de|it`.
 
 On the first run in a project, the plugin classifies every rule of `CLAUDE.md` and asks, in the conversation, the questions it cannot settle alone: should this rule be checked by a test, reviewed by a human, or ignored? Answers are saved in the project's `.claude/decisions-livraison.json` and never asked again.
 
@@ -83,7 +83,7 @@ After an interruption (window closed, context limit), run the same command again
 
 Every check has a status: **passed**, **failed**, **not applicable** (the project lacks that step, e.g. no `build` script: counts neither way) or **not run** (the step was expected but could not run: that is a failure). A project with no verification mechanism at all (no `check`, `test`, `test:regles`, `build` nor Playwright) never gets a green gate: nothing would be proven. A project without pages (library, command-line tool) declares it with `"interface_web": false` in `.claude/regles-livraison.json`.
 
-The report is written to the project's `rapport-livraison/`: `rapport.json` (details), `RESUME.txt` (plain-language summary, in French), one log per step and screenshots.
+The report is written to the project's `rapport-livraison/`: `rapport.json` (details), `RESUME.txt` (plain-language summary, in the project's language), one log per step and screenshots.
 
 ## 7. Files created in the project
 
@@ -106,6 +106,7 @@ The "No" files are added automatically to the project's `.gitignore`.
 | ---------------------- | ----------------- | --------------------------------------------------- |
 | `LIVRAISON_ESSAIS`     | `5`               | Number of fix attempts before giving up (1 to 50).  |
 | `LIVRAISON_NAVIGATEUR` | Chrome, then Edge | Force `chrome` or `msedge` for screenshots.         |
+| `LIVRAISON_LANGUE`     | `fr`              | Language of summaries and messages: `fr`, `en`, `es`, `de`, `it`. Otherwise `"langue"` in the rules file (`regles.mjs --langue=xx`). |
 
 Options of `.claude/regles-livraison.json`: `routes` (pages to check), `largeurs` (widths), `interdits` (forbidden patterns), `controles` and `revue_humaine` (keywords that classify a rule), `theme_sombre`, `interface_web`.
 
@@ -118,6 +119,8 @@ Options of `.claude/regles-livraison.json`: `routes` (pages to check), `largeurs
 **The plugin rewrote code I did not ask for.** That is the fix for a gate failure. The summary names the check that caused it. If the check is too strict, adjust it in `.claude/regles-livraison.json` rather than bypassing the gate.
 
 **An acceptance test looks weak.** Review it and strengthen it: a weak test gives a false green. This is the main known limit.
+
+**The gate is going in circles.** If, during a continuation (Claude Code reports `stop_hook_active`), the same failures recur three times in a row, the hook gives up before the fifth attempt, flagged "no progress". Claude Code itself caps at eight consecutive continuations without a tool call (`CLAUDE_CODE_STOP_HOOK_BLOCK_CAP`).
 
 **The attempts are exhausted, what happens?** The marker is removed so Claude can stop, but the delivery is recorded as **not finished**: `.livraison-etat.json` contains `"terminee": false`, the log notes it, and a system message shows it. Running the command again resumes from that state.
 
@@ -136,7 +139,7 @@ Options of `.claude/regles-livraison.json`: `routes` (pages to check), `largeurs
 
 ## 11. Testing the plugin itself
 
-`npm test` in the plugin folder runs 28 tests on temporary projects (created in the system temp folder, removed afterwards): valid project, failing test or build, JavaScript error, invalid configuration, missing or malformed `package.json`, two concurrent gates, directory traversal, missing or corrupted reports, exhausted attempts, project without tests, stale build in fast mode, project without a web interface, uncovered rule, acceptance test not run. Chromium and Playwright are required for the rendering scenarios.
+`npm test` in the plugin folder runs 37 tests on temporary projects (created in the system temp folder, removed afterwards): valid project, failing test or build, JavaScript error, invalid configuration, missing or malformed `package.json`, two concurrent gates, directory traversal, missing or corrupted reports, exhausted attempts, project without tests, stale build in fast mode, project without a web interface, uncovered rule, acceptance test not run. Chromium and Playwright are required for the rendering scenarios.
 
 ## 12. Going further
 

@@ -11,7 +11,7 @@ git clone https://github.com/Tuzilucas/livraison-coordonnee ~/tools/livraison-co
 cd /path/to/my-project && claude --plugin-dir ~/tools/livraison-coordonnee
 ```
 
-Then, inside Claude Code: `/livraison-coordonnee:livrer <your request>`. Step-by-step guide: [`NOTICE.en.md`](NOTICE.en.md). Contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md). MIT license. Version 1.5.0.
+Then, inside Claude Code: `/livraison-coordonnee:livrer <your request>`. Step-by-step guide: [`NOTICE.en.md`](NOTICE.en.md). Contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md). MIT license. Version 1.6.0.
 
 Validated on two real projects: a single-file web app (37 of 37 rules covered by a test) and a 900-page Next.js site (gate 9/9, merged and published). The engine has its own 28-test suite (`npm test`).
 
@@ -19,7 +19,7 @@ Validated on two real projects: a single-file web app (37 of 37 rules covered by
 
     /livraison-coordonnee:livrer <description of the request>
 
-Without a description, the command does nothing and asks what to produce. The command name and the plugin's messages are in French; the request itself can be written in any language Claude understands.
+Without a description, the command does nothing and asks what to produce. `/livraison-coordonnee:deliver` is the English twin of `livrer`: same procedure, and it records English as the language of the project's summaries and hook messages. The request itself can be written in any language.
 
 Installation:
 
@@ -41,6 +41,10 @@ Installation:
 6. **Verdict**: the stop hook (`scripts/verdict-arret.mjs`) re-runs the gate before any conclusion; on failure Claude is sent back to work; after the attempts are exhausted the delivery is recorded as "not finished". Log in `.livraison-journal.log`, resume after an interruption through `.livraison-etat.json`.
 
 Every check has a status: `reussi` (passed), `echoue` (failed), `sans_objet` (not applicable: the project lacks that step, counts neither way) or `non_execute` (expected but did not run: counts as a failure). A project with no verification mechanism at all never gets a green gate.
+
+## Languages
+
+The code, check names and technical report are in French. Summaries (`RESUME.txt`) and hook messages exist in **French, English, Spanish, German and Italian**. Selection: `LIVRAISON_LANGUE` environment variable, else `"langue"` in `.claude/regles-livraison.json` (set by `scripts/regles.mjs --langue=xx`), else French.
 
 ## Project rules file
 
@@ -85,6 +89,7 @@ Every check has a status: `reussi` (passed), `echoue` (failed), `sans_objet` (no
 
 See the French `README.md` for the full history. Highlights:
 
+- 1.6.0: summaries and messages in five languages (`LIVRAISON_LANGUE`, `--langue=xx`, `langue` in the rules file); English command `/livraison-coordonnee:deliver`. Stop hook aligned with the Claude Code documentation: reads `stop_hook_active`, gives up early when the same failures recur three times in a row during a continuation (Claude Code itself caps at eight consecutive continuations without a tool call, `CLAUDE_CODE_STOP_HOOK_BLOCK_CAP`), JSON marker (attempts, no-progress count, failure fingerprint; old numeric format accepted). 37 tests.
 - 1.5.0: technical audit. Static server confined to the build folder (real path resolution, symlinks and encodings refused), local interface and system-chosen port. Explicit check statuses; a project with no verification mechanism never gets a green gate; during a delivery the acceptance test must be run by a script, not merely exist; `interface_web: false` for projects without pages. Safe JSON reads, invalid forbidden patterns diagnosed, internal crash turned into a failure report. Lock against two concurrent gates. Browser always closed. Fast mode rebuilds when a dependency, lockfile, config or `.env` changed. Stop hook: `LIVRAISON_ESSAIS` bounded (1-50), unreadable marker tolerated, missing or malformed report treated as failure, exhaustion recorded as `terminee: false` with a system message. Engine test suite on temporary projects (28 tests).
 - 1.4.x: single command per request, acceptance test written first, nested collapsed blocks no longer counted as visible.
 - 1.0 to 1.3: `CLAUDE.md` rules turned into checks, stop-hook verdict, plain-language summaries, in-conversation review questions.
