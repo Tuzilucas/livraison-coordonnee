@@ -9,7 +9,7 @@ Request: $ARGUMENTS
 Procedure, without interruption:
 0. **Resume if needed**: if `.livraison-en-cours`, `.livraison-etat.json` or `rapport-livraison/CHOIX.txt` already exist, a delivery was interrupted. Read them, do not redo what is done (tests already written, decisions already recorded), and continue at the step where it stopped.
 1. **Mark the delivery**: create `.livraison-en-cours` at the project root (content `0`) if it does not exist yet.
-2. **Read the rules**: read `CLAUDE.md`, then run `node ${CLAUDE_PLUGIN_ROOT}/scripts/regles.mjs . --langue=en` (this also records English as the language of summaries and messages for this project).
+2. **Language, then rules**: run `node ${CLAUDE_PLUGIN_ROOT}/scripts/langue-demande.mjs . --langue=en "$ARGUMENTS"` (records English for this project; `livrer` detects the language of the request instead). Then read `CLAUDE.md` and run `node ${CLAUDE_PLUGIN_ROOT}/scripts/regles.mjs .`.
 3. **Settle minor choices yourself**: for every ambiguity, take the simplest solution that complies with `CLAUDE.md`. Record each choice in `rapport-livraison/CHOIX.txt` (one line: question, choice, reason).
 4. **Write the acceptance test first**: in `tests/`, a test tagged `demande:<short-name>` that verifies the request is fulfilled, with proof by failure (it must fail before your change). It must be run by `npm run test:regles` or by an existing script.
 5. **Produce** the requested change, with targeted edits, without touching texts or data that were not requested.

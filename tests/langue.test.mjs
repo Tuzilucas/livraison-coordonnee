@@ -153,3 +153,35 @@ test("regles.mjs --langue=en enregistre la langue dans le fichier de règles", a
   assert.equal(langueDe(dir, {}), "en");
   writeFileSync(join(dir, "CLAUDE.md"), "# P\n\n## Règles\n\n- Règle une.\n");
 });
+
+test("détection de la langue d'une demande : cinq langues, texte court ou ambigu → null", async () => {
+  const { detecter } = await import("../scripts/langue-demande.mjs");
+  assert.equal(detecter("Ajouter un bouton de partage sur la page d'accueil"), "fr");
+  assert.equal(detecter("Add a share button on the home page"), "en");
+  assert.equal(detecter("Añadir un botón de compartir en la página de inicio"), "es");
+  assert.equal(detecter("Füge auf der Startseite eine Schaltfläche zum Teilen hinzu"), "de");
+  assert.equal(detecter("Aggiungere un pulsante di condivisione nella pagina iniziale"), "it");
+  assert.equal(detecter("CSV"), null);
+  assert.equal(detecter(""), null);
+});
+
+test("langue-demande.mjs enregistre la langue détectée dans le projet, conserve le reste du fichier", async () => {
+  const { spawnSync } = await import("node:child_process");
+  const fs = await import("node:fs");
+  const dir = projet();
+  const script = join(import.meta.dirname, "..", "scripts", "langue-demande.mjs");
+  let r = spawnSync(
+    process.execPath,
+    [script, dir, "Add", "a", "share", "button", "on", "the", "home", "page"],
+    { encoding: "utf8" },
+  );
+  assert.equal(r.stdout.trim(), "en");
+  const regles = JSON.parse(fs.readFileSync(join(dir, ".claude", "regles-livraison.json"), "utf8"));
+  assert.equal(regles.langue, "en");
+  assert.deepEqual(regles.sections_claude_md, ["Règles"], "le reste du fichier est conservé");
+  r = spawnSync(process.execPath, [script, dir, "CSV"], { encoding: "utf8" });
+  assert.equal(r.stdout.trim(), "en", "texte ambigu : la langue enregistrée est gardée");
+  r = spawnSync(process.execPath, [script, dir, "--langue=de", "whatever", "text"], { encoding: "utf8" });
+  assert.equal(r.stdout.trim(), "de");
+  assert.equal(langueDe(dir, {}), "de");
+});

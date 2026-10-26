@@ -58,7 +58,9 @@ Dans la conversation :
 /livraison-coordonnee:livrer Ajouter un bouton « Exporter en CSV » sur la page des commandes
 ```
 
-Sans description, la commande ne lance rien et demande ce qu'il faut produire.
+Sans description, la commande ne lance rien et demande ce qu'il faut produire. La demande peut être écrite en
+français, anglais, espagnol, allemand ou italien : le plugin détecte sa langue et répond dans cette langue
+(résumé, messages, rendu final).
 
 Au premier lancement sur un projet, le plugin classe chaque règle de `CLAUDE.md` et pose dans la
 conversation les questions qu'il ne peut pas trancher seul : telle règle doit-elle être contrôlée par un
@@ -177,7 +179,7 @@ hook d'arrêt ne relancera plus la porte.
 
 ## 11. Tester le plugin lui-même
 
-`npm test` dans le dossier du plugin lance 37 tests sur des projets temporaires (créés dans le dossier
+`npm test` dans le dossier du plugin lance 39 tests sur des projets temporaires (créés dans le dossier
 temporaire du système, supprimés ensuite) : projet valide, test ou build en échec, erreur JavaScript,
 configuration invalide, `package.json` absent ou malformé, deux portes simultanées, traversée de
 répertoires, rapports absents ou corrompus, épuisement des essais, projet sans tests, build périmé en mode

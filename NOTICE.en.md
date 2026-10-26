@@ -50,7 +50,7 @@ In the conversation:
 /livraison-coordonnee:livrer Add an "Export to CSV" button on the orders page
 ```
 
-Without a description, the command does nothing and asks what to produce. The request can be written in any language. Use `/livraison-coordonnee:deliver` to get summaries and hook messages in English (`livrer` keeps French); other languages: `LIVRAISON_LANGUE=es|de|it`.
+Without a description, the command does nothing and asks what to produce. The request can be written in French, English, Spanish, German or Italian: the plugin detects its language and answers in it (summary, messages, final report). `/livraison-coordonnee:deliver` forces English.
 
 On the first run in a project, the plugin classifies every rule of `CLAUDE.md` and asks, in the conversation, the questions it cannot settle alone: should this rule be checked by a test, reviewed by a human, or ignored? Answers are saved in the project's `.claude/decisions-livraison.json` and never asked again.
 
@@ -139,7 +139,7 @@ Options of `.claude/regles-livraison.json`: `routes` (pages to check), `largeurs
 
 ## 11. Testing the plugin itself
 
-`npm test` in the plugin folder runs 37 tests on temporary projects (created in the system temp folder, removed afterwards): valid project, failing test or build, JavaScript error, invalid configuration, missing or malformed `package.json`, two concurrent gates, directory traversal, missing or corrupted reports, exhausted attempts, project without tests, stale build in fast mode, project without a web interface, uncovered rule, acceptance test not run. Chromium and Playwright are required for the rendering scenarios.
+`npm test` in the plugin folder runs 39 tests on temporary projects (created in the system temp folder, removed afterwards): valid project, failing test or build, JavaScript error, invalid configuration, missing or malformed `package.json`, two concurrent gates, directory traversal, missing or corrupted reports, exhausted attempts, project without tests, stale build in fast mode, project without a web interface, uncovered rule, acceptance test not run. Chromium and Playwright are required for the rendering scenarios.
 
 ## 12. Going further
 
