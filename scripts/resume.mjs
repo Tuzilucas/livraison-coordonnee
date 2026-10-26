@@ -4,6 +4,11 @@
 const LIBELLES = {
   "lecture-regles": "Les règles du projet (CLAUDE.md) sont bien lues",
   "verification-projet": "Le code passe ses vérifications automatiques (format, qualité, tests)",
+  "mécanismes de vérification":
+    "Le projet dispose de moyens de vérification (tests, construction ou navigateur)",
+  "package.json": "Le fichier package.json est lisible",
+  "porte de qualité": "La porte de qualité s'est exécutée sans erreur interne",
+  "test d'acceptation de la demande": "Un test prouve que la demande est remplie",
   "couverture des règles de CLAUDE.md": "Chaque règle importante est vérifiée par un test",
   donnees: "Les données du site sont valides",
   construction: "Le site se construit sans erreur",
@@ -32,18 +37,28 @@ export function detailEnFrancais(detail = "") {
     .replace(/ligne (\d+)/g, "règle ligne $1");
 }
 
-// Lignes du résumé : ce qui va, ce qui bloque, et la conclusion.
+// Statut d'un contrôle : « reussi », « echoue », « sans_objet » (le projet n'a pas cette étape) ou
+// « non_execute » (l'étape était attendue mais n'a pas pu tourner : c'est un échec).
+export function statutDe(c) {
+  if (c.statut) return c.statut;
+  if (c.ok) return (c.detail ?? "").includes("non applicable") ? "sans_objet" : "reussi";
+  return "echoue";
+}
+
+// Lignes du résumé : ce qui va, ce qui est sans objet, ce qui bloque, et la conclusion.
 export function resumeEnFrancais(controles) {
-  const bons = controles.filter((c) => c.ok && !(c.detail ?? "").includes("non applicable"));
+  const bons = controles.filter((c) => statutDe(c) === "reussi");
+  const sansObjet = controles.filter((c) => statutDe(c) === "sans_objet");
   const bloquants = controles.filter((c) => !c.ok);
   const lignes = [];
   const vus = new Set();
   const unique = (ligne) => (vus.has(ligne) ? false : vus.add(ligne));
   for (const c of bons) if (unique(`✅ ${libelle(c.nom)}`)) lignes.push(`✅ ${libelle(c.nom)}`);
-  for (const c of controles.filter((c) => c.ok && (c.detail ?? "").includes("non applicable")))
-    lignes.push(`➖ ${libelle(c.nom)} (sans objet pour ce projet)`);
+  for (const c of sansObjet) lignes.push(`➖ ${libelle(c.nom)} (sans objet pour ce projet)`);
   for (const c of bloquants)
-    lignes.push(`❌ ${libelle(c.nom)}${c.detail ? " — " + detailEnFrancais(c.detail) : ""}`);
+    lignes.push(
+      `❌ ${libelle(c.nom)}${statutDe(c) === "non_execute" ? " — non exécuté" : ""}${c.detail ? " — " + detailEnFrancais(c.detail) : ""}`,
+    );
   lignes.push("");
   lignes.push(
     bloquants.length === 0

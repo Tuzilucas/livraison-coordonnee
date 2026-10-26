@@ -27,11 +27,22 @@ const slug = (s) =>
 
 // Types de contrôle reconnus par mot-clé. Le premier motif trouvé gagne.
 const CONTROLES = [
-  { id: "processus", motif: /commit|ERROR_LOG|erreur significative|documentation/i, bloquant: false },
-  { id: "descriptif", motif: /dépôt (privé|public)|plus de dépendance à GitHub Actions/i, bloquant: false },
+  {
+    id: "processus",
+    motif: /commit|ERROR_LOG|erreur significative|documentation/i,
+    bloquant: false,
+  },
+  {
+    id: "descriptif",
+    motif: /dépôt (privé|public)|plus de dépendance à GitHub Actions/i,
+    bloquant: false,
+  },
   { id: "branche", motif: /travailler directement|branche|sur `main`/i },
   { id: "version", motif: /version|cache/i },
-  { id: "preservation", motif: /fonctionnalité existante|supprimer ni réécrire/i },
+  {
+    id: "preservation",
+    motif: /fonctionnalité existante|supprimer ni réécrire/i,
+  },
   { id: "stockage", motif: /clés localStorage|localStorage/i },
   { id: "migration", motif: /migrations?\//i },
   { id: "traduction", motif: /Traductions obligatoires/i },
@@ -39,14 +50,20 @@ const CONTROLES = [
   { id: "nommage", motif: /préfixe `bv`/i },
   { id: "investiture", motif: /investi|validation officielle/i },
   { id: "donnees", motif: /source|schema|zod|intégrit|validée/i },
-  { id: "publication", motif: /public-view|publication_status|seule passerelle/i },
+  {
+    id: "publication",
+    motif: /public-view|publication_status|seule passerelle/i,
+  },
   { id: "documentation", motif: /docs\/|détails|arbitrages/i },
   { id: "neutralite", motif: /neutralit|tri |score|recommandation/i },
   { id: "attribution", motif: /fait|déclaration|analyse/i },
   { id: "justice", motif: /justice|présomption|judiciaire/i },
   { id: "sondages", motif: /sondage|moyenne|probabilité/i },
   { id: "extrait", motif: /extrait|400|paywall/i },
-  { id: "interdit", motif: /secret|NEXT_PUBLIC|interne|review_note|clé|jeton/i },
+  {
+    id: "interdit",
+    motif: /secret|NEXT_PUBLIC|interne|review_note|clé|jeton/i,
+  },
   { id: "affichage", motif: /affich|mobile|contraste|responsive|écran/i },
   { id: "construction", motif: /statique|export|build|construi/i },
 ];

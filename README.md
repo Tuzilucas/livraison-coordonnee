@@ -11,7 +11,7 @@ git clone https://github.com/Tuzilucas/livraison-coordonnee ~/outils/livraison-c
 cd /chemin/vers/mon-projet && claude --plugin-dir ~/outils/livraison-coordonnee
 ```
 
-Puis, dans Claude Code : `/livraison-coordonnee:livrer <votre demande>`. Notice pas à pas : [`NOTICE.md`](NOTICE.md). Licence MIT. Version 1.4.1.
+Puis, dans Claude Code : `/livraison-coordonnee:livrer <votre demande>`. Notice pas à pas : [`NOTICE.md`](NOTICE.md). Licence MIT. Version 1.5.0.
 
 Validé en conditions réelles sur deux projets : une application web en un seul fichier (37 règles sur 37 contrôlées par un test) et un site Next.js de 900 pages (porte 9/9, fusion et publication).
 
@@ -117,6 +117,7 @@ Aucune garantie n'est perdue : le mode rapide sert seulement à corriger plus vi
 
 ## Versions
 
+- 1.5.0 : audit technique. Serveur de contrôle confiné au dossier construit (chemins résolus réellement, liens symboliques et encodages refusés), interface locale et port libre choisi par le système. Statuts explicites des contrôles : « reussi », « echoue », « sans_objet » (ne compte pas dans la fiabilité) et « non_execute » (compte comme un échec) ; un projet sans aucun mécanisme de vérification n'obtient jamais de porte verte ; pendant une livraison, le test d'acceptation doit être exécuté par un script (`test:regles`, `check` ou `test`), pas seulement présent ; `interface_web: false` déclare un projet sans pages. Lecture sûre des JSON (règles, `package.json`), motifs interdits invalides diagnostiqués, plantage interne de la porte converti en rapport d'échec. Verrou contre deux portes simultanées. Navigateur toujours fermé, même sur exception. Mode rapide : le build est refait si une dépendance, un lockfile, une configuration ou un `.env` a changé. Hook d'arrêt : `LIVRAISON_ESSAIS` borné (1 à 50), marqueur illisible toléré, rapport absent ou malformé traité comme un échec, abandon après épuisement consigné dans `.livraison-etat.json` (`terminee: false`) et signalé par un message système. Faux positifs corrigés : icône d'onglet absente, dossier de tests non suivi par Git. Suite de tests du moteur sur projets temporaires (`npm test`, 28 tests).
 - 1.4.1 : contrôle d'affichage : un résumé imbriqué dans un bloc replié n'est plus compté comme visible (faux positifs de chevauchement sur des `details` imbriqués). Validé en conditions réelles sur BattleVote (37/37 règles testées, version 1.14.0 en production) et sur Pièces à l'appui (porte 9/9, fusion et publication).
 - 1.4.0 : une seule commande pour une demande : test d'acceptation écrit d'abord (exigé par la porte pendant une livraison), choix mineurs notés dans CHOIX.txt, cinq essais au lieu de trois.
 - 1.3.1 : page de questions adaptative : une colonne sur téléphone, deux sur ordinateur, zones de toucher de 44 px minimum (mesuré à 320 et 1440 px).

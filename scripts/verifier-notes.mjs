@@ -85,7 +85,11 @@ for (const expert of EXPERTS) {
   }
   if (bloquant) problemes.push(`contrôle bloquant non passé : ${bloquant[2].slice(0, 80)}`);
   if (problemes.length)
-    lignes.push({ expert, note: 0, raison: problemes.join(" ; ") + ` (la note calculée était ${note})` });
+    lignes.push({
+      expert,
+      note: 0,
+      raison: problemes.join(" ; ") + ` (la note calculée était ${note})`,
+    });
   else
     lignes.push({
       expert,

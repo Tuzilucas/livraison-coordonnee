@@ -4,8 +4,8 @@
 // Sortie : rapport-livraison/rapport.json et rapport-livraison/*.log ; code 0 seulement si tout passe.
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { createServer } from "node:http";
 import { resumeEnFrancais } from "./resume.mjs";
+import { demarrer } from "./serveur.mjs";
 import { createRequire } from "node:module";
 import { extname, join, resolve } from "node:path";
 
@@ -19,6 +19,7 @@ const entreesIgnorees = [
   ".livraison-en-cours",
   ".livraison-journal.log",
   ".livraison-etat.json",
+  ".livraison-porte.lock",
   "rapport-livraison/",
 ];
 {
@@ -36,13 +37,102 @@ const entreesIgnorees = [
     );
 }
 const rapportDir = join(projet, "rapport-livraison");
+// Une seule porte à la fois par projet : deux instances écriraient le même rapport et se liraient l'une l'autre.
+const verrou = join(projet, ".livraison-porte.lock");
+{
+  const pidActif = (pid) => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch (e) {
+      return e.code === "EPERM";
+    }
+  };
+  const ancien = existsSync(verrou) ? Number.parseInt(readFileSync(verrou, "utf8"), 10) : NaN;
+  if (Number.isFinite(ancien) && ancien !== process.pid && pidActif(ancien)) {
+    console.error(
+      `Une autre porte de qualité tourne déjà sur ce projet (processus ${ancien}). Attendre sa fin avant de relancer.`,
+    );
+    process.exit(2);
+  }
+  writeFileSync(verrou, String(process.pid));
+  process.on("exit", () => {
+    try {
+      if (readFileSync(verrou, "utf8") === String(process.pid)) rmSync(verrou, { force: true });
+    } catch {}
+  });
+}
 // Repart d'un dossier vide : un rapport de la passe précédente ne doit pas être contrôlé comme code.
 rmSync(rapportDir, { recursive: true, force: true });
 mkdirSync(rapportDir, { recursive: true });
 const controles = [];
-const enregistrer = (nom, ok, detail = "") => controles.push({ nom, ok, detail });
+// Statuts : « reussi », « echoue », « sans_objet » (le projet n'a pas cette étape : ne compte ni pour ni contre),
+// « non_execute » (étape attendue qui n'a pas pu tourner : compte comme un échec).
+const enregistrer = (nom, ok, detail = "", statut = ok ? "reussi" : "echoue") =>
+  controles.push({
+    nom,
+    ok: statut === "sans_objet" ? true : ok && statut !== "non_execute",
+    detail,
+    statut,
+  });
 // Captures produites par la porte : ce sont les preuves que les experts doivent citer.
 const captures = [];
+// Lecture d'un JSON : une erreur de syntaxe ou de forme est un diagnostic, jamais un plantage silencieux.
+function lireJson(fichier) {
+  try {
+    const v = JSON.parse(readFileSync(fichier, "utf8").replace(/^\uFEFF/, ""));
+    if (!v || typeof v !== "object" || Array.isArray(v)) return { erreur: "doit être un objet JSON" };
+    return { valeur: v };
+  } catch (e) {
+    return { erreur: e.message.split("\n")[0] };
+  }
+}
+// Rapport final, aussi utilisé si la porte plante : un plantage est un échec explicite, avec rapport.
+function conclure(erreurInterne) {
+  if (erreurInterne)
+    enregistrer(
+      "porte de qualité",
+      false,
+      "erreur interne : " +
+        String(erreurInterne?.stack ?? erreurInterne)
+          .split("\n")
+          .slice(0, 3)
+          .join(" "),
+    );
+  const comptes = controles.filter((c) => c.statut !== "sans_objet");
+  const reussis = comptes.filter((c) => c.ok).length;
+  const fiabilite = comptes.length ? Math.round(((10 * reussis) / comptes.length) * 10) / 10 : 0;
+  const reussi = controles.length > 0 && controles.every((c) => c.ok);
+  const rapport = {
+    date: new Date().toISOString(),
+    reussi,
+    fiabilite,
+    controles,
+    captures,
+  };
+  mkdirSync(rapportDir, { recursive: true });
+  writeFileSync(join(rapportDir, "rapport.json"), JSON.stringify(rapport, null, 2));
+  // Point de reprise : si la session est coupée, la prochaine commande sait où on en était.
+  writeFileSync(
+    join(projet, ".livraison-etat.json"),
+    JSON.stringify(
+      {
+        date: rapport.date,
+        reussi,
+        fiabilite,
+        controles_echoues: controles.filter((c) => !c.ok).map((c) => c.nom),
+      },
+      null,
+      2,
+    ) + "\n",
+  );
+  const resume = resumeEnFrancais(controles);
+  writeFileSync(join(rapportDir, "RESUME.txt"), resume + "\n");
+  console.log("\n" + resume + "\n");
+  process.exit(reussi ? 0 : 1);
+}
+process.on("uncaughtException", (e) => conclure(e));
+process.on("unhandledRejection", (e) => conclure(e));
 
 // 1. Fonctionnement : tests, construction et contrôle du projet, tels qu'ils sont définis dans le dépôt.
 function commande(nom, cmd, args, env = {}) {
@@ -63,8 +153,14 @@ let regles = null;
 if (!existsSync(claudeMd)) enregistrer("lecture-regles", false, "CLAUDE.md absent");
 else if (!existsSync(reglesFile))
   enregistrer("lecture-regles", false, ".claude/regles-livraison.json absent");
+else if (lireJson(reglesFile).erreur)
+  enregistrer(
+    "lecture-regles",
+    false,
+    `.claude/regles-livraison.json illisible : ${lireJson(reglesFile).erreur}`,
+  );
 else {
-  regles = JSON.parse(readFileSync(reglesFile, "utf8"));
+  regles = lireJson(reglesFile).valeur;
   const norm = (s) => s.trim().toLowerCase();
   const titres = readFileSync(claudeMd, "utf8")
     .split("\n")
@@ -80,10 +176,14 @@ else {
 }
 
 // Profil du projet : la porte ne fait que ce que le projet sait faire. Une étape absente est notée « non applicable ».
-const pkg = existsSync(join(projet, "package.json"))
-  ? JSON.parse(readFileSync(join(projet, "package.json"), "utf8"))
-  : {};
-const scripts = pkg.scripts ?? {};
+const fichierPkg = join(projet, "package.json");
+const lecturePkg = existsSync(fichierPkg) ? lireJson(fichierPkg) : { valeur: {} };
+if (lecturePkg.erreur) enregistrer("package.json", false, `package.json illisible : ${lecturePkg.erreur}`);
+const pkg = lecturePkg.valeur ?? {};
+const scripts = pkg.scripts && typeof pkg.scripts === "object" ? pkg.scripts : {};
+// Projet sans interface web (bibliothèque, outil en ligne de commande) : déclaré par « interface_web: false »
+// dans .claude/regles-livraison.json ; les contrôles d'affichage sont alors sans objet, pas en échec.
+const sansInterfaceWeb = regles?.interface_web === false;
 const aPlaywright = ["playwright.config.ts", "playwright.config.js", "playwright.config.mjs"].some((f) =>
   existsSync(join(projet, f)),
 );
@@ -115,11 +215,27 @@ const aThemeSombre =
   Boolean(dist) && /prefers-color-scheme|data-theme/.test(readFileSync(join(dist, "index.html"), "utf8"));
 
 if (scripts.check) commande("verification-projet", "npm", ["run", "check"]);
-else enregistrer("verification-projet", true, "pas de script check : non applicable");
+else enregistrer("verification-projet", true, "pas de script check : non applicable", "sans_objet");
+// Un projet qui n'offre aucun moyen de vérification ne peut pas obtenir une porte verte : il n'y aurait rien de prouvé.
+{
+  const mecanismes = [
+    scripts.check && "check",
+    scripts["test:regles"] && "test:regles",
+    scripts.test && "test",
+    scripts.build && "build",
+    aPlaywright && "playwright",
+  ].filter(Boolean);
+  enregistrer(
+    "mécanismes de vérification",
+    mecanismes.length > 0,
+    mecanismes.length
+      ? mecanismes.join(", ")
+      : "aucun script check, test, test:regles ou build, ni Playwright : la porte ne peut rien prouver",
+  );
+}
 // Couverture : chaque règle de CLAUDE.md doit être reliée à un contrôle exécuté ici. Une règle non couverte bloque.
-const reglesGenerees = join(projet, ".claude", "regles-livraison.json");
-if (existsSync(reglesGenerees)) {
-  const generees = JSON.parse(readFileSync(reglesGenerees, "utf8"));
+if (regles) {
+  const generees = regles;
   const sansControle = (generees.regles ?? []).filter((r) => r.bloquante !== false && !r.couverte);
   enregistrer(
     "couverture des règles de CLAUDE.md",
@@ -128,8 +244,10 @@ if (existsSync(reglesGenerees)) {
   );
   // Contrôle « donnees » : la validation des données du projet, si elle existe.
   const donneesCouvertes = (generees.regles ?? []).some((r) => r.controle === "donnees");
-  if (donneesCouvertes && readFileSync(join(projet, "package.json"), "utf8").includes('"data:validate"'))
-    commande("donnees", "npm", ["run", "data:validate"]);
+  if (donneesCouvertes && scripts["data:validate"]) commande("donnees", "npm", ["run", "data:validate"]);
+  // Sans script data:validate, la règle reste couverte par son test étiqueté (contrôle de couverture ci-dessus).
+  else if (donneesCouvertes)
+    enregistrer("donnees", true, "pas de script data:validate : non applicable", "sans_objet");
 } else
   enregistrer(
     "couverture des règles de CLAUDE.md",
@@ -138,7 +256,35 @@ if (existsSync(reglesGenerees)) {
   );
 // Mode rapide seulement : build réutilisé si out/ est plus récent que le code. La porte finale reconstruit toujours.
 function codeModifieDepuis(instant) {
-  const racines = ["src", "public", "data", "scripts", "package.json", "next.config.ts", "next.config.mjs"]
+  // Tout ce qui influence un build : code, données, configuration, dépendances (lockfiles, node_modules installés), environnement.
+  const racines = [
+    "src",
+    "app",
+    "pages",
+    "components",
+    "lib",
+    "styles",
+    "content",
+    "public",
+    "data",
+    "scripts",
+    "package.json",
+    "package-lock.json",
+    "pnpm-lock.yaml",
+    "yarn.lock",
+    "node_modules/.package-lock.json",
+    "next.config.ts",
+    "next.config.mjs",
+    "next.config.js",
+    "tsconfig.json",
+    "tailwind.config.ts",
+    "tailwind.config.js",
+    "postcss.config.mjs",
+    "postcss.config.js",
+    ".env",
+    ".env.local",
+    ".env.production",
+  ]
     .map((f) => join(projet, f))
     .filter((f) => existsSync(f));
   const parcourir = (p) =>
@@ -147,11 +293,18 @@ function codeModifieDepuis(instant) {
 }
 const indexOut = join(projet, "out", "index.html");
 if (!scripts.build) {
-  enregistrer("construction", true, "pas de script build : site statique servi tel quel");
+  enregistrer(
+    "construction",
+    true,
+    "pas de script build : non applicable, site statique servi tel quel",
+    "sans_objet",
+  );
 } else if (rapide && existsSync(indexOut) && !codeModifieDepuis(statSync(indexOut).mtimeMs)) {
   enregistrer("construction", true, "build réutilisé (code inchangé depuis le dernier build)");
 } else {
-  commande("construction", "npm", ["run", "build"], { NEXT_PUBLIC_BASE_PATH: "" });
+  commande("construction", "npm", ["run", "build"], {
+    NEXT_PUBLIC_BASE_PATH: "",
+  });
 }
 if (scripts["test:regles"]) commande("tests-des-regles", "npm", ["run", "test:regles"]);
 // Demande : pendant une livraison, il faut un test d'acceptation étiqueté « demande:<nom> » qui prouve que la demande est remplie.
@@ -166,7 +319,10 @@ if (existsSync(join(projet, ".livraison-en-cours"))) {
   // Le test doit être nouveau ou modifié pendant cette livraison : un ancien test ne peut pas prouver une nouvelle demande.
   const modifies = (() => {
     try {
-      return execFileSync("git", ["status", "--porcelain", "--", "tests"], { cwd: projet, encoding: "utf8" })
+      return execFileSync("git", ["status", "--porcelain", "--untracked-files=all", "--", "tests"], {
+        cwd: projet,
+        encoding: "utf8",
+      })
         .split("\n")
         .filter(Boolean)
         .map((l) => l.slice(3));
@@ -187,16 +343,24 @@ if (existsSync(join(projet, ".livraison-en-cours"))) {
         ),
       ]
     : [];
-  enregistrer(
-    "test d'acceptation de la demande",
-    fichiersDemande.length > 0,
-    modifies === null
-      ? "impossible de vérifier (pas de dépôt Git) : ajouter un test « demande:<nom> » modifié pendant la livraison"
-      : "aucun test « demande:<nom> » nouveau ou modifié pendant cette livraison ne prouve la demande",
-  );
+  if (fichiersDemande.length > 0 && !scripts["test:regles"] && !scripts.check && !scripts.test)
+    enregistrer(
+      "test d'acceptation de la demande",
+      false,
+      "le test « demande:<nom> » existe mais aucun script (test:regles, check ou test) ne l'exécute",
+      "non_execute",
+    );
+  else
+    enregistrer(
+      "test d'acceptation de la demande",
+      fichiersDemande.length > 0,
+      modifies === null
+        ? "impossible de vérifier (pas de dépôt Git) : ajouter un test « demande:<nom> » modifié pendant la livraison"
+        : "aucun test « demande:<nom> » nouveau ou modifié pendant cette livraison ne prouve la demande",
+    );
 }
 if (aPlaywright) commande("tests-bout-en-bout", "npx", ["playwright", "test"]);
-else enregistrer("tests-bout-en-bout", true, "pas de Playwright : non applicable");
+else enregistrer("tests-bout-en-bout", true, "pas de Playwright : non applicable", "sans_objet");
 
 // 3. Règles interdites, vérifiées sur le site construit.
 function fichiers(dir, out = []) {
@@ -209,9 +373,14 @@ function fichiers(dir, out = []) {
 }
 if (regles) {
   for (const r of regles.interdits ?? []) {
-    const trouves = dist
-      ? fichiers(dist).filter((p) => new RegExp(r.motif).test(readFileSync(p, "utf8")))
-      : [];
+    let motif;
+    try {
+      motif = new RegExp(r.motif);
+    } catch (e) {
+      enregistrer(`interdit : ${r.description ?? r.motif}`, false, `motif invalide : ${e.message}`);
+      continue;
+    }
+    const trouves = dist ? fichiers(dist).filter((p) => motif.test(readFileSync(p, "utf8"))) : [];
     enregistrer(
       `interdit : ${r.description ?? r.motif}`,
       trouves.length === 0,
@@ -224,38 +393,35 @@ if (regles) {
 }
 
 // 4. Affichage : chaque page clé, à chaque largeur (petits téléphones, téléphones, tablettes, ordinateurs).
-if (!dist) enregistrer("affichage", false, "aucun dossier servi (out/, public/ ou index.html)");
+if (sansInterfaceWeb)
+  enregistrer("affichage", true, "projet sans interface web : non applicable", "sans_objet");
+else if (!dist) enregistrer("affichage", false, "aucun dossier servi (out/, public/ ou index.html)");
 else {
-  const types = {
-    ".html": "text/html",
-    ".js": "text/javascript",
-    ".css": "text/css",
-    ".json": "application/json",
-    ".svg": "image/svg+xml",
-    ".png": "image/png",
-    ".woff2": "font/woff2",
-    ".txt": "text/plain",
-    ".xml": "application/xml",
-    ".webp": "image/webp",
-  };
-  const { readFileSync: lire } = await import("node:fs");
-  const serveur = createServer((req, res) => {
-    let chemin = join(dist, decodeURIComponent(req.url.split("?")[0]));
-    if (existsSync(chemin) && statSync(chemin).isDirectory()) chemin = join(chemin, "index.html");
-    if (!existsSync(chemin)) {
-      res.writeHead(404);
-      return res.end();
-    }
-    res.writeHead(200, { "Content-Type": types[extname(chemin)] ?? "application/octet-stream" });
-    res.end(lire(chemin));
-  });
-  await new Promise((ok) => serveur.listen(4399, ok));
-  const port = 4399;
+  const { serveur, url: base } = await demarrer(dist);
+  let navigateur = null;
   try {
-    const req = createRequire(join(projet, "package.json"));
-    const { chromium } = req("@playwright/test");
-    const navigateur = await chromium
-      .launch({ executablePath: process.env.CHROMIUM_PATH || "/opt/pw-browsers/chromium" })
+    // Playwright : celui du projet d'abord, sinon celui installé à côté du plugin ou globalement (NODE_PATH).
+    const chargerPlaywright = () => {
+      const essais = [
+        [createRequire(join(projet, "package.json")), "@playwright/test"],
+        [createRequire(join(projet, "package.json")), "playwright"],
+        [createRequire(import.meta.url), "@playwright/test"],
+        [createRequire(import.meta.url), "playwright"],
+      ];
+      const erreurs = [];
+      for (const [req, nom] of essais)
+        try {
+          return req(nom);
+        } catch (e) {
+          erreurs.push(`${nom} : ${e.message.split("\n")[0]}`);
+        }
+      throw new Error("Playwright introuvable (" + erreurs.join(" ; ") + ")");
+    };
+    const { chromium } = chargerPlaywright();
+    navigateur = await chromium
+      .launch({
+        executablePath: process.env.CHROMIUM_PATH || "/opt/pw-browsers/chromium",
+      })
       .catch(() => chromium.launch());
     const largeurs = rapide ? [320, 390, 1024] : (regles?.largeurs ?? [320, 360, 390, 768, 1024, 1440]);
     const routes = regles?.routes ?? routesDetectees(dist);
@@ -275,7 +441,7 @@ else {
         });
         // Les échecs réseau (polices, statistiques externes) dépendent de l'environnement : ils sont ignorés ici.
         const reponse = await page
-          .goto(`http://localhost:${port}${route}`, { waitUntil: "networkidle" })
+          .goto(`${base}${encodeURI(route)}`, { waitUntil: "networkidle" })
           .catch(() => null);
         if (!reponse || reponse.status() !== 200) {
           problemes.push(`${route} @${w}px : page absente`);
@@ -484,7 +650,10 @@ else {
         const nom = route.replace(/\//g, "_") || "accueil";
         await page.evaluate(() => window.scrollTo(0, 0));
         const fichierHaut = `capture-${nom}-${w}-haut.png`;
-        await page.screenshot({ path: join(rapportDir, fichierHaut), fullPage: false });
+        await page.screenshot({
+          path: join(rapportDir, fichierHaut),
+          fullPage: false,
+        });
         captures.push(fichierHaut);
         await page.close();
         if (aThemeSombre && [390, 1440].includes(w)) {
@@ -500,20 +669,20 @@ else {
               localStorage.setItem("theme", "dark");
             } catch (e) {}
           });
-          await sombre
-            .goto(`http://localhost:${port}${route}`, { waitUntil: "networkidle" })
-            .catch(() => null);
+          await sombre.goto(`${base}${encodeURI(route)}`, { waitUntil: "networkidle" }).catch(() => null);
           await sombre.waitForTimeout(300);
           if ((await sombre.evaluate(() => document.documentElement.dataset.theme)) !== "dark")
             problemes.push(`${route} @${w}px : thème sombre non appliqué`);
           const fichierSombre = `capture-${nom}-${w}-sombre.png`;
-          await sombre.screenshot({ path: join(rapportDir, fichierSombre), fullPage: false });
+          await sombre.screenshot({
+            path: join(rapportDir, fichierSombre),
+            fullPage: false,
+          });
           captures.push(fichierSombre);
           await sombre.close();
         }
       }
     }
-    await navigateur.close();
     enregistrer(
       "affichage et adaptation (" +
         routes.length +
@@ -532,34 +701,13 @@ else {
       false,
       "contrôle impossible (installer @playwright/test et Chromium dans le projet) : " +
         e.message.split("\n")[0],
+      "non_execute",
     );
   } finally {
+    if (navigateur) await navigateur.close().catch(() => {});
     serveur.close();
   }
 }
 
-// 5. Verdict : tout doit passer. La fiabilité est la part des contrôles réussis, sur 10.
-const reussis = controles.filter((c) => c.ok).length;
-const fiabilite = Math.round(((10 * reussis) / controles.length) * 10) / 10;
-const reussi = controles.every((c) => c.ok);
-const rapport = { date: new Date().toISOString(), reussi, fiabilite, controles, captures };
-writeFileSync(join(rapportDir, "rapport.json"), JSON.stringify(rapport, null, 2));
-// Point de reprise : si la session est coupée, la prochaine commande sait où on en était.
-writeFileSync(
-  join(projet, ".livraison-etat.json"),
-  JSON.stringify(
-    {
-      date: rapport.date,
-      reussi,
-      fiabilite,
-      controles_echoues: controles.filter((c) => !c.ok).map((c) => c.nom),
-    },
-    null,
-    2,
-  ) + "\n",
-);
-// Résumé lisible en français, écrit à côté du rapport technique et affiché.
-const resume = resumeEnFrancais(controles);
-writeFileSync(join(rapportDir, "RESUME.txt"), resume + "\n");
-console.log("\n" + resume + "\n");
-process.exit(reussi ? 0 : 1);
+// 5. Verdict : tout doit passer. La fiabilité est la part des contrôles réussis (hors « sans objet »), sur 10.
+conclure();

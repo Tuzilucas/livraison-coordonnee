@@ -7,7 +7,12 @@ import { resolve } from "node:path";
 
 const file = resolve(process.argv[2] ?? "");
 const html = readFileSync(file, "utf8");
-const result = { fichier: file, syntaxe_js: null, affichage: null, erreurs: [] };
+const result = {
+  fichier: file,
+  syntaxe_js: null,
+  affichage: null,
+  erreurs: [],
+};
 
 const scripts = [...html.matchAll(/<script(?![^>]*src=)[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
 try {
