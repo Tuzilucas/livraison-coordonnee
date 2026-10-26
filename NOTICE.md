@@ -1,4 +1,4 @@
-# Notice d'utilisation — plugin `livraison-coordonnee` (version 1.4.1)
+# Notice d'utilisation — plugin `livraison-coordonnee` (version 1.5.0)
 
 Plugin pour Claude Code. Une commande livre une demande en respectant les règles de votre projet, et ne la
 déclare terminée qu'après une porte de qualité réussie. Cette notice s'adresse à quelqu'un qui découvre
@@ -93,6 +93,13 @@ s'est arrêté grâce à `.livraison-etat.json`.
 | Interdits                                      | Aucun motif interdit (secret, donnée interne) dans les fichiers construits.                              |
 | Affichage                                      | À 320, 360, 390, 768, 1024 et 1440 px (et en thème sombre s'il est déclaré) : pas de défilement horizontal, pas de texte hors écran ni superposé, cibles tactiles d'au moins 24 px, aucune erreur JavaScript. |
 
+Chaque contrôle a un statut : **réussi**, **échoué**, **sans objet** (le projet n'a pas cette étape, par exemple
+pas de script `build` : le contrôle ne compte ni pour ni contre) ou **non exécuté** (l'étape était attendue
+mais n'a pas pu tourner : c'est un échec). Un projet qui n'a aucun mécanisme de vérification (ni `check`,
+ni `test`, ni `test:regles`, ni `build`, ni Playwright) n'obtient jamais de porte verte : il n'y aurait rien
+de prouvé. Un projet sans pages (bibliothèque, outil en ligne de commande) le déclare avec
+`"interface_web": false` dans `.claude/regles-livraison.json`.
+
 Le rapport est écrit dans `rapport-livraison/` du projet : `rapport.json` (détail), `RESUME.txt`
 (résumé en français), journaux de chaque étape et captures d'écran.
 
@@ -106,6 +113,7 @@ Le rapport est écrit dans `rapport-livraison/` du projet : `rapport.json` (dét
 | `.livraison-en-cours`                | Marqueur de livraison                        | Non          |
 | `.livraison-etat.json`               | Point de reprise                             | Non          |
 | `.livraison-journal.log`             | Journal horodaté des décisions du hook       | Non          |
+| `.livraison-porte.lock`              | Verrou : une seule porte à la fois           | Non          |
 | `rapport-livraison/`                 | Rapport, résumé, captures                    | Non          |
 
 Les fichiers « Non » sont ajoutés automatiquement au `.gitignore` du projet.
@@ -114,7 +122,7 @@ Les fichiers « Non » sont ajoutés automatiquement au `.gitignore` du projet.
 
 | Variable d'environnement | Valeur par défaut           | Rôle                                            |
 | ------------------------ | --------------------------- | ----------------------------------------------- |
-| `LIVRAISON_ESSAIS`       | `5`                         | Nombre d'essais de correction avant abandon.    |
+| `LIVRAISON_ESSAIS`       | `5`                         | Nombre d'essais de correction avant abandon (1 à 50). |
 | `LIVRAISON_NAVIGATEUR`   | Chrome, puis Edge           | Forcer `chrome` ou `msedge` pour les captures.  |
 
 Options de `.claude/regles-livraison.json` : `routes` (pages à contrôler), `largeurs`, `interdits`,
@@ -135,6 +143,13 @@ porte. Le résumé indique quel contrôle l'a motivée. Si le contrôle est trop
 **Un test d'acceptation me paraît faible.** Le relire et le renforcer : un test trop faible donne un faux
 vert. C'est la principale limite connue.
 
+**Les essais sont épuisés, que se passe-t-il ?** Le marqueur est retiré pour que Claude puisse s'arrêter,
+mais la livraison est consignée comme **non terminée** : `.livraison-etat.json` contient `"terminee": false`,
+le journal le note, et un message système l'affiche. Relancer la commande reprend à cet état.
+
+**Le serveur de contrôle est-il exposé ?** Non : il n'écoute que sur `127.0.0.1`, sur un port libre choisi
+par le système, et ne sert que les fichiers du dossier construit (tout chemin qui en sort est refusé).
+
 **Comment arrêter une livraison en cours ?** Supprimer `.livraison-en-cours` à la racine du projet ; le
 hook d'arrêt ne relancera plus la porte.
 
@@ -143,12 +158,25 @@ hook d'arrêt ne relancera plus la porte.
 - Les tests écrits par le plugin doivent être relus au début.
 - Le contrôle d'affichage détecte des défauts mesurables (débordement, superposition, cibles trop
   petites), pas le goût ni la pertinence des textes.
+- La détection automatique des pages s'arrête à deux niveaux de dossiers ; au-delà, lister les pages dans
+  `routes` de `.claude/regles-livraison.json`. Une page non listée n'est pas contrôlée.
+- Le contraste n'est mesuré que sur fond de couleur unie ; les textes sur image ou dégradé sont comptés
+  « non mesurables », jamais validés.
 - Le navigateur de contrôle a été exercé dans un environnement de développement ; Chrome et Edge sur
   poste restent à essayer largement.
 - Deux projets ont servi à la validation (une application web en un seul fichier et un site Next.js de
   900 pages). Un nouveau projet demande une première passe pour écrire ses tests de règles.
 
-## 11. Pour aller plus loin
+## 11. Tester le plugin lui-même
+
+`npm test` dans le dossier du plugin lance 28 tests sur des projets temporaires (créés dans le dossier
+temporaire du système, supprimés ensuite) : projet valide, test ou build en échec, erreur JavaScript,
+configuration invalide, `package.json` absent ou malformé, deux portes simultanées, traversée de
+répertoires, rapports absents ou corrompus, épuisement des essais, projet sans tests, build périmé en mode
+rapide, projet sans interface web, règle non couverte, test d'acceptation non exécuté. Chromium et
+Playwright sont nécessaires pour les scénarios d'affichage.
+
+## 12. Pour aller plus loin
 
 - `README.md` : avantages, inconvénients, résultats mesurés, historique des versions.
 - `commands/livrer.md` : la procédure exacte suivie par la commande.
