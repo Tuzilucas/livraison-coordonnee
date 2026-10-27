@@ -11,7 +11,7 @@ git clone https://github.com/Tuzilucas/livraison-coordonnee ~/tools/livraison-co
 cd /path/to/my-project && claude --plugin-dir ~/tools/livraison-coordonnee
 ```
 
-Then, inside Claude Code: `/livraison-coordonnee:livrer <your request>`. Step-by-step guide: [`NOTICE.en.md`](NOTICE.en.md). Contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md). MIT license. Version 1.6.0.
+Then, inside Claude Code: `/livraison-coordonnee:livrer <your request>`. Step-by-step guide: [`NOTICE.en.md`](NOTICE.en.md). Contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md). MIT license. Version 1.6.1.
 
 Validated on two real projects: a single-file web app (37 of 37 rules covered by a test) and a 900-page Next.js site (gate 9/9, merged and published). The engine has its own 28-test suite (`npm test`).
 
