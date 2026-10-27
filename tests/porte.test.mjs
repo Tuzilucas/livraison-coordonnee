@@ -23,6 +23,16 @@ test("1. projet valide : porte verte, rapport et résumé cohérents", () => {
   assert.equal(r.rapport.fiabilite, 10);
 });
 
+test("1b. une modification de CLAUDE.md invalide la configuration de règles préexistante", () => {
+  const dir = projet();
+  writeFileSync(join(dir, "CLAUDE.md"), "# Projet de test\n\n## Règles\n\n- Règle une.\n- Nouvelle règle bloquante.\n");
+  const r = lancerPorte(dir);
+  assert.equal(r.code, 1);
+  const c = controle(r.rapport, "lecture-regles");
+  assert.equal(c.ok, false);
+  assert.match(c.detail, /configuration périmée/);
+});
+
 test("2. script check en échec : refus, contrôle nommé", () => {
   const r = lancerPorte(projet({ check: 'node -e "process.exit(3)"' }));
   assert.equal(r.code, 1);
