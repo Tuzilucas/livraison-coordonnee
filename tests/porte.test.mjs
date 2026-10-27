@@ -129,14 +129,21 @@ test("15. contournement : test d'acceptation présent mais qu'aucun script n'ex�
   assert.match(r.resume, /non exécuté/);
 });
 
-test("15b. test d'acceptation présent et exécuté par test:regles : accepté", () => {
-  const dir = projet({ testRegles: 'node -e "0"', git: true });
+test("15b. test d'acceptation exécuté par le script dédié : accepté", () => {
+  const dir = projet({
+    testAcceptance: "node --test tests/demande.test.mjs",
+    git: true,
+  });
   writeFileSync(join(dir, ".livraison-en-cours"), "0");
   mkdirSync(join(dir, "tests"), { recursive: true });
-  writeFileSync(join(dir, "tests", "demande.test.mjs"), "// demande:bouton\n");
+  writeFileSync(
+    join(dir, "tests", "demande.test.mjs"),
+    'import { test } from "node:test"; import assert from "node:assert/strict"; test("demande:bouton", () => assert.equal(1, 1));\n',
+  );
   const r = lancerPorte(dir);
   assert.equal(r.code, 0, r.stderr + r.stdout);
   assert.equal(controle(r.rapport, "test d'acceptation").ok, true);
+  assert.equal(controle(r.rapport, "execution-test-acceptation").ok, true);
 });
 
 test("B. un contrôle « sans objet » ne compte pas dans la fiabilité et n'est pas affiché comme réussi", () => {
