@@ -1,12 +1,14 @@
 {
   "name": "tuzilucas",
-  "owner": { "name": "Lucas Tuzi" },
+  "owner": {
+    "name": "Lucas Tuzi"
+  },
   "plugins": [
     {
       "name": "livraison-coordonnee",
       "source": "./",
       "description": "Une commande livre une demande en appliquant les règles du projet (CLAUDE.md), avec test d'acceptation et porte de qualité avant de déclarer la livraison terminée.",
-      "version": "1.6.0"
+      "version": "1.6.1"
     }
   ]
 }
