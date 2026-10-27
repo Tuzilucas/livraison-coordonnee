@@ -3,7 +3,18 @@
 // Usage : node gate.mjs <dossier-du-projet>
 // Sortie : rapport-livraison/rapport.json et rapport-livraison/*.log ; code 0 seulement si tout passe.
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  closeSync,
+  existsSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { resumeEnFrancais } from "./resume.mjs";
 import { demarrer } from "./serveur.mjs";
 import { langueDe, normaliser } from "./langue.mjs";
@@ -41,10 +52,11 @@ const entreesIgnorees = [
     );
 }
 const rapportDir = join(projet, "rapport-livraison");
-// Une seule porte à la fois par projet : deux instances écriraient le même rapport et se liraient l'une l'autre.
+// Verrou atomique : openSync("wx") évite que deux processus passent simultanément le contrôle d'existence.
 const verrou = join(projet, ".livraison-porte.lock");
 {
   const pidActif = (pid) => {
+    if (!Number.isSafeInteger(pid) || pid < 1) return false;
     try {
       process.kill(pid, 0);
       return true;
@@ -52,14 +64,39 @@ const verrou = join(projet, ".livraison-porte.lock");
       return e.code === "EPERM";
     }
   };
-  const ancien = existsSync(verrou) ? Number.parseInt(readFileSync(verrou, "utf8"), 10) : NaN;
-  if (Number.isFinite(ancien) && ancien !== process.pid && pidActif(ancien)) {
-    console.error(
-      `Une autre porte de qualité tourne déjà sur ce projet (processus ${ancien}). Attendre sa fin avant de relancer.`,
-    );
+  let acquis = false;
+  for (let tentative = 0; tentative < 2 && !acquis; tentative++) {
+    let fd;
+    try {
+      fd = openSync(verrou, "wx");
+      writeFileSync(fd, String(process.pid));
+      closeSync(fd);
+      acquis = true;
+    } catch (e) {
+      if (fd !== undefined) {
+        try { closeSync(fd); } catch {}
+      }
+      if (e.code !== "EEXIST") throw e;
+      let ancien = NaN;
+      try {
+        ancien = Number.parseInt(readFileSync(verrou, "utf8").trim(), 10);
+      } catch {}
+      if (pidActif(ancien)) {
+        console.error(
+          `Une autre porte de qualité tourne déjà sur ce projet (processus ${ancien}). Attendre sa fin avant de relancer.`,
+        );
+        process.exit(2);
+      }
+      // Verrou périmé : le retirer puis retenter une acquisition atomique.
+      try { unlinkSync(verrou); } catch (erreur) {
+        if (erreur.code !== "ENOENT") throw erreur;
+      }
+    }
+  }
+  if (!acquis) {
+    console.error("Impossible d'acquérir le verrou de la porte de qualité.");
     process.exit(2);
   }
-  writeFileSync(verrou, String(process.pid));
   process.on("exit", () => {
     try {
       if (readFileSync(verrou, "utf8") === String(process.pid)) rmSync(verrou, { force: true });
