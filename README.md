@@ -11,9 +11,9 @@ git clone https://github.com/Tuzilucas/livraison-coordonnee ~/outils/livraison-c
 cd /chemin/vers/mon-projet && claude --plugin-dir ~/outils/livraison-coordonnee
 ```
 
-Puis, dans Claude Code : `/livraison-coordonnee:livrer <votre demande>`. Notice pas à pas : [`NOTICE.md`](NOTICE.md). Contribuer : [`CONTRIBUTING.md`](CONTRIBUTING.md). Licence MIT. Version 1.6.0.
+Puis, dans Claude Code : `/livraison-coordonnee:livrer <votre demande>`. Notice pas à pas : [`NOTICE.md`](NOTICE.md). Contribuer : [`CONTRIBUTING.md`](CONTRIBUTING.md). Licence MIT. Version 1.6.1.
 
-Validé en conditions réelles sur deux projets : une application web en un seul fichier (37 règles sur 37 contrôlées par un test) et un site Next.js de 900 pages (porte 9/9, fusion et publication). Le moteur a sa propre suite de 28 tests (`npm test`).
+Validé en conditions réelles sur deux projets : une application web en un seul fichier (37 règles sur 37 contrôlées par un test) et un site Next.js de 900 pages (porte 9/9, fusion et publication). Le moteur dispose d'une suite de tests automatisée (`npm test`) et d'une vérification continue sur chaque push et pull request.
 
 ## Utilisation
 
