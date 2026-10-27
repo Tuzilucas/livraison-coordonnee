@@ -265,6 +265,7 @@ else enregistrer("verification-projet", true, "pas de script check : non applica
   const mecanismes = [
     scripts.check && "check",
     scripts["test:regles"] && "test:regles",
+    scripts["test:acceptance"] && "test:acceptance",
     scripts.test && "test",
     scripts.build && "build",
     aPlaywright && "playwright",
