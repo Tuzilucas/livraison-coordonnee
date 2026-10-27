@@ -408,7 +408,7 @@ if (existsSync(join(projet, ".livraison-en-cours"))) {
       ...new Set(
         fichiersDemande.flatMap((f) => {
           const c = readFileSync(join(projet, f), "utf8");
-          return [...c.matchAll(/demande:[\\w-]+/g)].map((m) => m[0]);
+          return [...c.matchAll(/demande:[\w-]+/g)].map((m) => m[0]);
         }),
       ),
     ];
