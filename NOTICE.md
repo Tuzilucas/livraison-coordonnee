@@ -1,4 +1,4 @@
-# Notice d'utilisation — plugin `livraison-coordonnee` (version 1.6.0)
+# Notice d'utilisation — plugin `livraison-coordonnee` (version 1.6.1)
 
 _[English version](NOTICE.en.md)_
 
@@ -179,7 +179,7 @@ hook d'arrêt ne relancera plus la porte.
 
 ## 11. Tester le plugin lui-même
 
-`npm test` dans le dossier du plugin lance 39 tests sur des projets temporaires (créés dans le dossier
+`npm test` dans le dossier du plugin lance la suite de tests sur des projets temporaires (créés dans le dossier
 temporaire du système, supprimés ensuite) : projet valide, test ou build en échec, erreur JavaScript,
 configuration invalide, `package.json` absent ou malformé, deux portes simultanées, traversée de
 répertoires, rapports absents ou corrompus, épuisement des essais, projet sans tests, build périmé en mode
