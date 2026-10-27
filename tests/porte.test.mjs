@@ -129,6 +129,14 @@ test("15. contournement : test d'acceptation présent mais qu'aucun script n'ex�
   assert.match(r.resume, /non exécuté/);
 });
 
+test("16. le script npm test est réellement exécuté et son échec bloque", () => {
+  const r = lancerPorte(projet({ test: 'node -e "process.exit(4)"' }));
+  assert.equal(r.code, 1);
+  const c = controle(r.rapport, "tests-projet");
+  assert.equal(c.ok, false);
+  assert.match(c.detail, /code 4/);
+});
+
 test("15b. test d'acceptation exécuté par le script dédié : accepté", () => {
   const dir = projet({
     testAcceptance: "node --test tests/demande.test.mjs",
