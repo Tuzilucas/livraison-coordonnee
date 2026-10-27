@@ -23,6 +23,19 @@ test("1. projet valide : porte verte, rapport et résumé cohérents", () => {
   assert.equal(r.rapport.fiabilite, 10);
 });
 
+test("1b. une modification de CLAUDE.md invalide la configuration de règles préexistante", () => {
+  const dir = projet();
+  writeFileSync(
+    join(dir, "CLAUDE.md"),
+    "# Projet de test\n\n## Règles\n\n- Règle une.\n- Nouvelle règle bloquante.\n",
+  );
+  const r = lancerPorte(dir);
+  assert.equal(r.code, 1);
+  const c = controle(r.rapport, "lecture-regles");
+  assert.equal(c.ok, false);
+  assert.match(c.detail, /configuration périmée/);
+});
+
 test("2. script check en échec : refus, contrôle nommé", () => {
   const r = lancerPorte(projet({ check: 'node -e "process.exit(3)"' }));
   assert.equal(r.code, 1);
@@ -34,6 +47,65 @@ test("3. build en échec : refus", () => {
   const r = lancerPorte(projet({ build: 'node -e "process.exit(1)"' }));
   assert.equal(r.code, 1);
   assert.equal(controle(r.rapport, "construction").ok, false);
+});
+
+test("3b. le contrôle visuel porte sur la sortie du build, pas sur public/ obsolète", () => {
+  const dir = projet({ build: "node build.mjs" });
+  writeFileSync(
+    join(dir, "build.mjs"),
+    `import { mkdirSync, writeFileSync } from "node:fs";
+mkdirSync("out", { recursive: true });
+writeFileSync("out/index.html", '<!doctype html><html><body><script>throw new Error("erreur-sortie-build")</script></body></html>');`,
+  );
+  const r = lancerPorte(dir);
+  assert.equal(r.code, 1);
+  const a = controle(r.rapport, "affichage");
+  assert.equal(a.ok, false);
+  assert.match(a.detail, /erreur-sortie-build/);
+});
+
+test("3c. sans liste « routes », les pages profondes sont détectées et contrôlées", () => {
+  const dir = projet();
+  mkdirSync(join(dir, "public", "guides", "niveau", "trois"), { recursive: true });
+  writeFileSync(
+    join(dir, "public", "guides", "niveau", "trois", "index.html"),
+    '<!doctype html><html><body><script>throw new Error("route-profonde-cassee")</script></body></html>',
+  );
+  const r = lancerPorte(dir);
+  assert.equal(r.code, 1);
+  const a = controle(r.rapport, "affichage");
+  assert.equal(a.ok, false);
+  assert.match(a.detail, /route-profonde-cassee/);
+});
+
+test("3d. une liste « routes » renseignée est explicite : seules ces pages sont contrôlées", () => {
+  const dir = projet({
+    regles: { sections_claude_md: ["Règles"], regles: [{ ligne: 5, couverte: true }], routes: ["/"] },
+  });
+  mkdirSync(join(dir, "public", "cassee"), { recursive: true });
+  writeFileSync(
+    join(dir, "public", "cassee", "index.html"),
+    '<!doctype html><html><body><script>throw new Error("page-hors-liste")</script></body></html>',
+  );
+  const r = lancerPorte(dir);
+  assert.equal(r.code, 0, r.stderr + r.stdout);
+  assert.match(controle(r.rapport, "affichage et adaptation").nom, /\(1 pages/);
+});
+
+test("3e. détection plafonnée : au-delà de 40 pages, le rapport dit combien sont contrôlées et comment en lister", () => {
+  const dir = projet();
+  for (let i = 0; i < 45; i++) {
+    mkdirSync(join(dir, "public", `p${String(i).padStart(2, "0")}`), { recursive: true });
+    writeFileSync(
+      join(dir, "public", `p${String(i).padStart(2, "0")}`, "index.html"),
+      "<!doctype html><p>ok</p>",
+    );
+  }
+  const r = lancerPorte(dir, ["--rapide"]);
+  assert.equal(r.code, 0, r.stderr + r.stdout);
+  const a = controle(r.rapport, "affichage et adaptation");
+  assert.match(a.nom, /\(40 pages/);
+  assert.match(a.detail, /46 pages détectées, 40 contrôlées \(plafond 40\)/);
 });
 
 test("4. erreur JavaScript dans la page : refus du contrôle d'affichage", () => {
@@ -129,14 +201,74 @@ test("15. contournement : test d'acceptation présent mais qu'aucun script n'ex�
   assert.match(r.resume, /non exécuté/);
 });
 
-test("15b. test d'acceptation présent et exécuté par test:regles : accepté", () => {
-  const dir = projet({ testRegles: 'node -e "0"', git: true });
+test("16. le script npm test est réellement exécuté et son échec bloque", () => {
+  const r = lancerPorte(projet({ test: 'node -e "process.exit(4)"' }));
+  assert.equal(r.code, 1);
+  const c = controle(r.rapport, "tests-projet");
+  assert.equal(c.ok, false);
+  assert.match(c.detail, /code 4/);
+});
+
+test("15b. test d'acceptation exécuté par le script dédié : accepté", () => {
+  const dir = projet({
+    testAcceptance: "node --test tests/demande.test.mjs",
+    git: true,
+  });
+  writeFileSync(join(dir, ".livraison-en-cours"), "0");
+  mkdirSync(join(dir, "tests"), { recursive: true });
+  writeFileSync(
+    join(dir, "tests", "demande.test.mjs"),
+    'import { test } from "node:test"; import assert from "node:assert/strict"; test("demande:bouton", () => assert.equal(1, 1));\n',
+  );
+  const r = lancerPorte(dir);
+  assert.equal(r.code, 0, r.stderr + r.stdout);
+  assert.equal(controle(r.rapport, "test d'acceptation").ok, true);
+  assert.equal(controle(r.rapport, "execution-test-acceptation").ok, true);
+});
+
+test("15d. compatibilité : exécuté par test:regles, preuve par le chemin du fichier (sortie type vitest)", () => {
+  const dir = projet({
+    testRegles: "node -e \"console.log('✓ tests/demande.test.mjs (1 test)')\"",
+    git: true,
+  });
   writeFileSync(join(dir, ".livraison-en-cours"), "0");
   mkdirSync(join(dir, "tests"), { recursive: true });
   writeFileSync(join(dir, "tests", "demande.test.mjs"), "// demande:bouton\n");
   const r = lancerPorte(dir);
   assert.equal(r.code, 0, r.stderr + r.stdout);
   assert.equal(controle(r.rapport, "test d'acceptation").ok, true);
+  assert.match(controle(r.rapport, "test d'acceptation").detail, /« test:regles »/);
+});
+
+test("15c. un script test:acceptance qui réussit sans exécuter le test ne suffit pas", () => {
+  const dir = projet({ testAcceptance: 'node -e "process.exit(0)"', git: true });
+  writeFileSync(join(dir, ".livraison-en-cours"), "0");
+  mkdirSync(join(dir, "tests"), { recursive: true });
+  writeFileSync(join(dir, "tests", "demande.test.mjs"), "// demande:bouton\n");
+  const r = lancerPorte(dir);
+  assert.equal(r.code, 1);
+  const c = controle(r.rapport, "test d'acceptation");
+  assert.equal(c.ok, false);
+  assert.equal(c.statut, "non_execute");
+  assert.match(c.detail, /ne montre ni l'étiquette ni le fichier/);
+});
+
+test("E. environnement des commandes : CI=1 pour les lanceurs de tests, jamais pour le build ni Playwright", () => {
+  // Le build doit voir l'environnement du projet tel quel (un vrai site lit CI pour choisir son navigateur Playwright).
+  const dir = projet({
+    build: 'node -e "process.exit(process.env.CI ? 7 : 0)"',
+    test: 'node -e "process.exit(process.env.CI ? 0 : 8)"',
+    testRegles: 'node -e "process.exit(process.env.NODE_TEST_CONTEXT ? 9 : 0)"',
+  });
+  const r = lancerPorte(dir, [], { CI: "" });
+  assert.equal(r.code, 0, r.stderr + r.stdout);
+  assert.equal(controle(r.rapport, "construction").ok, true, "le build ne doit pas recevoir CI=1");
+  assert.equal(controle(r.rapport, "tests-projet").ok, true, "npm test doit recevoir CI=1");
+  assert.equal(
+    controle(r.rapport, "tests-des-regles").ok,
+    true,
+    "NODE_TEST_CONTEXT ne doit pas être transmis",
+  );
 });
 
 test("B. un contrôle « sans objet » ne compte pas dans la fiabilité et n'est pas affiché comme réussi", () => {

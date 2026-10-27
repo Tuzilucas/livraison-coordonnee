@@ -16,7 +16,7 @@ cd livraison-coordonnee
 npm test
 ```
 
-28 tests sur des projets temporaires (créés dans le dossier temporaire du système, supprimés ensuite). Chromium et Playwright sont nécessaires pour les scénarios d'affichage ; sans eux, ces tests échouent, ce qui est attendu.
+La suite tourne sur des projets temporaires (créés dans le dossier temporaire du système, supprimés ensuite). Chromium et Playwright sont nécessaires pour les scénarios d'affichage ; sans eux, ces tests échouent, ce qui est attendu.
 
 ## Ce qui est accepté
 
@@ -61,7 +61,7 @@ cd livraison-coordonnee
 npm test
 ```
 
-28 tests on temporary projects (created in the system temp folder, removed afterwards). Chromium and Playwright are required for the display scenarios; without them those tests fail, which is expected.
+The suite runs on temporary projects (created in the system temp folder, removed afterwards). Chromium and Playwright are required for the display scenarios; without them those tests fail, which is expected.
 
 ## What is accepted
 

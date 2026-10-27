@@ -11,9 +11,9 @@ git clone https://github.com/Tuzilucas/livraison-coordonnee ~/outils/livraison-c
 cd /chemin/vers/mon-projet && claude --plugin-dir ~/outils/livraison-coordonnee
 ```
 
-Puis, dans Claude Code : `/livraison-coordonnee:livrer <votre demande>`. Notice pas à pas : [`NOTICE.md`](NOTICE.md). Contribuer : [`CONTRIBUTING.md`](CONTRIBUTING.md). Licence MIT. Version 1.6.0.
+Puis, dans Claude Code : `/livraison-coordonnee:livrer <votre demande>`. Notice pas à pas : [`NOTICE.md`](NOTICE.md). Contribuer : [`CONTRIBUTING.md`](CONTRIBUTING.md). Licence MIT. Version 1.6.1.
 
-Validé en conditions réelles sur deux projets : une application web en un seul fichier (37 règles sur 37 contrôlées par un test) et un site Next.js de 900 pages (porte 9/9, fusion et publication). Le moteur a sa propre suite de 28 tests (`npm test`).
+Validé en conditions réelles sur deux projets : une application web en un seul fichier (37 règles sur 37 contrôlées par un test) et un site Next.js de 900 pages (porte 9/9, fusion et publication). Le moteur dispose d'une suite de tests automatisée (`npm test`) et d'une vérification continue sur chaque push et pull request.
 
 ## Utilisation
 
@@ -51,7 +51,7 @@ Le code, les noms de contrôles et le rapport technique sont en français. Les r
 `.claude/regles-livraison.json`, généré par `scripts/regles.mjs` puis complété à la main :
 
 - `sections_claude_md` : sections de `CLAUDE.md` que le fichier couvre (obligatoire) ;
-- `routes` : pages à contrôler (sinon détection automatique, deux niveaux de dossiers) ;
+- `routes` : liste explicite des pages à contrôler (vide = détection automatique à toute profondeur, plafonnée à 40) ;
 - `largeurs` : largeurs d'écran (par défaut 320 à 1440 px) ;
 - `interdits` : motifs qui ne doivent apparaître dans aucun fichier construit ;
 - `controles`, `revue_humaine` : mots-clés qui classent une règle ;
@@ -81,12 +81,13 @@ Le code, les noms de contrôles et le rapport technique sont en français. Les r
 ## Limites connues
 
 - Les tests écrits par le plugin doivent être relus au début : un test trop faible donne un faux vert.
-- Les pages sont détectées jusqu'à deux niveaux de dossiers ; au-delà, les lister dans `routes`.
+- La détection automatique des pages est plafonnée à 40 ; au-delà, lister les pages importantes dans `routes`.
 - Le contraste n'est mesuré que sur fond de couleur unie ; les textes sur image sont comptés « non mesurables », jamais validés.
 - L'installation par la place de marché Claude Code suit le format documenté mais n'a pas encore été essayée sur un poste.
 
 ## Versions
 
+- 1.6.1 : audit de fiabilité (PR #1). Rapport de porte refusé s'il est vide, malformé ou incohérent (succès déclaré avec un contrôle en échec). Fichier de règles refusé s'il ne porte pas l'empreinte du `CLAUDE.md` actuel. `npm test` exécuté quand il existe. Test d'acceptation : exécuté par `test:acceptance`, sinon `test:regles`, sinon `test`, et preuve d'exécution exigée dans la sortie (étiquette ou fichier). Contrôles visuels sur la sortie réelle du build. Routes : liste explicite si renseignée, sinon détection à toute profondeur plafonnée à 40 pages. Verrou atomique. Lanceurs de tests unitaires lancés avec `CI=1` (jamais le build ni Playwright) et commandes enfants sans les variables du lanceur de tests de Node. CI GitHub Actions Node 20 et 22 avec Chromium.
 - 1.6.0 : la commande `livrer` détecte la langue de la demande et s'exécute dans cette langue ; résumés et messages en cinq langues (fr, en, es, de, it ; `LIVRAISON_LANGUE`, `--langue=xx`, `langue` du fichier de règles) ; commande anglaise `/livraison-coordonnee:deliver`. Hook d'arrêt aligné sur la documentation Claude Code : lecture de `stop_hook_active`, abandon anticipé quand les mêmes échecs reviennent trois fois de suite pendant une continuation (plafond Claude Code de huit continuations consécutives sans appel d'outil, `CLAUDE_CODE_STOP_HOOK_BLOCK_CAP`), marqueur au format JSON (tentatives, sans progrès, empreinte des échecs ; ancien format numérique accepté). 39 tests.
 - 1.5.0 : audit technique. Serveur de contrôle confiné au dossier construit (chemins résolus réellement, liens symboliques et encodages refusés), interface locale et port libre choisi par le système. Statuts explicites des contrôles : « reussi », « echoue », « sans_objet » (ne compte pas dans la fiabilité) et « non_execute » (compte comme un échec) ; un projet sans aucun mécanisme de vérification n'obtient jamais de porte verte ; pendant une livraison, le test d'acceptation doit être exécuté par un script (`test:regles`, `check` ou `test`), pas seulement présent ; `interface_web: false` déclare un projet sans pages. Lecture sûre des JSON (règles, `package.json`), motifs interdits invalides diagnostiqués, plantage interne de la porte converti en rapport d'échec. Verrou contre deux portes simultanées. Navigateur toujours fermé, même sur exception. Mode rapide : le build est refait si une dépendance, un lockfile, une configuration ou un `.env` a changé. Hook d'arrêt : `LIVRAISON_ESSAIS` borné (1 à 50), marqueur illisible toléré, rapport absent ou malformé traité comme un échec, abandon après épuisement consigné dans `.livraison-etat.json` (`terminee: false`) et signalé par un message système. Faux positifs corrigés : icône d'onglet absente, dossier de tests non suivi par Git. Suite de tests du moteur sur projets temporaires (`npm test`, 28 tests).
 - 1.4.1 : contrôle d'affichage : un résumé imbriqué dans un bloc replié n'est plus compté comme visible (faux positifs de chevauchement sur des `details` imbriqués). Validé en conditions réelles sur BattleVote (37/37 règles testées, version 1.14.0 en production) et sur Pièces à l'appui (porte 9/9, fusion et publication).

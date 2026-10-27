@@ -1,5 +1,6 @@
 // Projets temporaires isolés pour tester le moteur sans toucher à un vrai dépôt.
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -19,16 +20,20 @@ const PAGE = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta n
 export function creerProjet(options = {}) {
   const dir = mkdtempSync(join(tmpdir(), "livraison-test-"));
   const o = { check: 'node -e "process.exit(0)"', index: true, ...options };
-  writeFileSync(join(dir, "CLAUDE.md"), "# Projet de test\n\n## Règles\n\n- Règle une.\n");
+  const texteClaude = "# Projet de test\n\n## Règles\n\n- Règle une.\n";
+  writeFileSync(join(dir, "CLAUDE.md"), texteClaude);
   mkdirSync(join(dir, ".claude"), { recursive: true });
   writeFileSync(
     join(dir, ".claude", "regles-livraison.json"),
     typeof o.regles === "string"
       ? o.regles
       : JSON.stringify(
-          o.regles ?? {
-            sections_claude_md: ["Règles"],
-            regles: [{ ligne: 5, couverte: true }],
+          {
+            ...(o.regles ?? {
+              sections_claude_md: ["Règles"],
+              regles: [{ ligne: 5, couverte: true }],
+            }),
+            source_sha256: createHash("sha256").update(texteClaude).digest("hex"),
           },
           null,
           2,
@@ -40,6 +45,7 @@ export function creerProjet(options = {}) {
     if (o.build) scripts.build = o.build;
     if (o.test) scripts.test = o.test;
     if (o.testRegles) scripts["test:regles"] = o.testRegles;
+    if (o.testAcceptance) scripts["test:acceptance"] = o.testAcceptance;
     writeFileSync(
       join(dir, "package.json"),
       typeof o.pkg === "string"

@@ -3,7 +3,20 @@
 // Usage : node gate.mjs <dossier-du-projet>
 // Sortie : rapport-livraison/rapport.json et rapport-livraison/*.log ; code 0 seulement si tout passe.
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import {
+  closeSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { resumeEnFrancais } from "./resume.mjs";
 import { demarrer } from "./serveur.mjs";
 import { langueDe, normaliser } from "./langue.mjs";
@@ -41,10 +54,11 @@ const entreesIgnorees = [
     );
 }
 const rapportDir = join(projet, "rapport-livraison");
-// Une seule porte à la fois par projet : deux instances écriraient le même rapport et se liraient l'une l'autre.
+// Verrou atomique : openSync("wx") évite que deux processus passent simultanément le contrôle d'existence.
 const verrou = join(projet, ".livraison-porte.lock");
 {
   const pidActif = (pid) => {
+    if (!Number.isSafeInteger(pid) || pid < 1) return false;
     try {
       process.kill(pid, 0);
       return true;
@@ -52,14 +66,43 @@ const verrou = join(projet, ".livraison-porte.lock");
       return e.code === "EPERM";
     }
   };
-  const ancien = existsSync(verrou) ? Number.parseInt(readFileSync(verrou, "utf8"), 10) : NaN;
-  if (Number.isFinite(ancien) && ancien !== process.pid && pidActif(ancien)) {
-    console.error(
-      `Une autre porte de qualité tourne déjà sur ce projet (processus ${ancien}). Attendre sa fin avant de relancer.`,
-    );
+  let acquis = false;
+  for (let tentative = 0; tentative < 2 && !acquis; tentative++) {
+    let fd;
+    try {
+      fd = openSync(verrou, "wx");
+      writeFileSync(fd, String(process.pid));
+      closeSync(fd);
+      acquis = true;
+    } catch (e) {
+      if (fd !== undefined) {
+        try {
+          closeSync(fd);
+        } catch {}
+      }
+      if (e.code !== "EEXIST") throw e;
+      let ancien = NaN;
+      try {
+        ancien = Number.parseInt(readFileSync(verrou, "utf8").trim(), 10);
+      } catch {}
+      if (pidActif(ancien)) {
+        console.error(
+          `Une autre porte de qualité tourne déjà sur ce projet (processus ${ancien}). Attendre sa fin avant de relancer.`,
+        );
+        process.exit(2);
+      }
+      // Verrou périmé : le retirer puis retenter une acquisition atomique.
+      try {
+        unlinkSync(verrou);
+      } catch (erreur) {
+        if (erreur.code !== "ENOENT") throw erreur;
+      }
+    }
+  }
+  if (!acquis) {
+    console.error("Impossible d'acquérir le verrou de la porte de qualité.");
     process.exit(2);
   }
-  writeFileSync(verrou, String(process.pid));
   process.on("exit", () => {
     try {
       if (readFileSync(verrou, "utf8") === String(process.pid)) rmSync(verrou, { force: true });
@@ -139,10 +182,20 @@ process.on("uncaughtException", (e) => conclure(e));
 process.on("unhandledRejection", (e) => conclure(e));
 
 // 1. Fonctionnement : tests, construction et contrôle du projet, tels qu'ils sont définis dans le dépôt.
-function commande(nom, cmd, args, env = {}) {
+// Environnement des commandes enfants : les variables du lanceur de tests de Node (NODE_TEST_CONTEXT) ne sont pas
+// transmises, sinon un « node --test » enfant se croit sous-processus d'un autre lanceur et n'écrit plus sa sortie
+// normale. CI=1 n'est posé que pour les lanceurs de tests unitaires (vitest, jest…), dont le mode « veille » ne
+// rendrait jamais la main ; pas pour le build ni Playwright, dont la configuration des projets lit souvent CI
+// (navigateur, serveur, nouvelles tentatives) et changerait de comportement.
+function environnementEnfant(env = {}, { testsUnitaires = false } = {}) {
+  const base = { ...process.env, ...(testsUnitaires ? { CI: "1" } : {}), ...env };
+  for (const k of Object.keys(base)) if (k.startsWith("NODE_TEST_")) delete base[k];
+  return base;
+}
+function commande(nom, cmd, args, env = {}, options = {}) {
   const r = spawnSync(cmd, args, {
     cwd: projet,
-    env: { ...process.env, ...env },
+    env: environnementEnfant(env, options),
     encoding: "utf8",
     maxBuffer: 256 * 1024 * 1024,
   });
@@ -166,17 +219,22 @@ else if (lireJson(reglesFile).erreur)
 else {
   regles = lireJson(reglesFile).valeur;
   const norm = (s) => s.trim().toLowerCase();
-  const titres = readFileSync(claudeMd, "utf8")
+  const texteClaude = readFileSync(claudeMd, "utf8");
+  const titres = texteClaude
     .split("\n")
     .filter((l) => l.startsWith("## "))
     .map((l) => norm(l.slice(3)));
   const couverts = (regles.sections_claude_md ?? []).map(norm);
   const manquants = titres.filter((t) => !couverts.includes(t));
-  enregistrer(
-    "lecture-regles",
-    manquants.length === 0,
-    manquants.length ? `sections non traitées : ${manquants.join(", ")}` : "",
-  );
+  const hashActuel = createHash("sha256").update(texteClaude).digest("hex");
+  const reglesPerimees = typeof regles.source_sha256 !== "string" || regles.source_sha256 !== hashActuel;
+  const problemesRegles = [];
+  if (manquants.length) problemesRegles.push(`sections non traitées : ${manquants.join(", ")}`);
+  if (reglesPerimees)
+    problemesRegles.push(
+      "configuration périmée : CLAUDE.md a changé ou la configuration n'a pas d'empreinte fiable ; relancer scripts/regles.mjs",
+    );
+  enregistrer("lecture-regles", problemesRegles.length === 0, problemesRegles.join(" ; "));
 }
 
 // Profil du projet : la porte ne fait que ce que le projet sait faire. Une étape absente est notée « non applicable ».
@@ -197,25 +255,40 @@ function racineServie() {
     if (existsSync(join(projet, d, "index.html"))) return join(projet, d);
   return null;
 }
-// Routes détectées : chaque dossier qui contient un index.html (au plus deux niveaux).
-function routesDetectees(racine) {
-  if (!racine) return ["/"];
+// Routes détectées à toute profondeur, largeur d'abord (les pages proches de l'accueil passent en premier), plafonnées :
+// un site de 900 pages ne peut pas être visité page par page à six largeurs. lstatSync évite de suivre les liens
+// symboliques hors du livrable. Au-delà du plafond, lister les pages à contrôler dans « routes ».
+const ROUTES_MAX = 40;
+function routesDetectees(racine, max = ROUTES_MAX) {
+  if (!racine) return { routes: ["/"], total: 1, tronque: false };
   const routes = [];
-  const parcourir = (dir, profondeur, chemin) => {
-    if (existsSync(join(dir, "index.html"))) routes.push(chemin);
-    if (profondeur >= 2) return;
-    for (const f of readdirSync(dir)) {
-      const p = join(dir, f);
-      if (statSync(p).isDirectory() && !f.startsWith(".") && f !== "node_modules")
-        parcourir(p, profondeur + 1, `${chemin}${f}/`);
+  let total = 0;
+  const file = [[racine, "/"]];
+  while (file.length) {
+    const [dir, chemin] = file.shift();
+    if (existsSync(join(dir, "index.html"))) {
+      total++;
+      if (routes.length < max) routes.push(chemin);
     }
-  };
-  parcourir(racine, 0, "/");
-  return routes.length ? routes : ["/"];
+    let entrees = [];
+    try {
+      entrees = readdirSync(dir).sort();
+    } catch {
+      continue;
+    }
+    for (const f of entrees) {
+      if (f.startsWith(".") || f === "node_modules") continue;
+      const p = join(dir, f);
+      try {
+        if (lstatSync(p).isDirectory()) file.push([p, `${chemin}${f}/`]);
+      } catch {}
+    }
+  }
+  return { routes: routes.length ? routes : ["/"], total: Math.max(total, 1), tronque: total > max };
 }
-const dist = racineServie();
+let dist = racineServie();
 // Thème sombre : contrôlé seulement si le site déclare un mécanisme de thème (sinon il n'y a rien à vérifier).
-const aThemeSombre =
+let aThemeSombre =
   Boolean(dist) && /prefers-color-scheme|data-theme/.test(readFileSync(join(dist, "index.html"), "utf8"));
 
 if (scripts.check) commande("verification-projet", "npm", ["run", "check"]);
@@ -225,6 +298,7 @@ else enregistrer("verification-projet", true, "pas de script check : non applica
   const mecanismes = [
     scripts.check && "check",
     scripts["test:regles"] && "test:regles",
+    scripts["test:acceptance"] && "test:acceptance",
     scripts.test && "test",
     scripts.build && "build",
     aPlaywright && "playwright",
@@ -310,7 +384,14 @@ if (!scripts.build) {
     NEXT_PUBLIC_BASE_PATH: "",
   });
 }
-if (scripts["test:regles"]) commande("tests-des-regles", "npm", ["run", "test:regles"]);
+// Le build peut créer ou remplacer le dossier servi : les contrôles visuels doivent viser sa sortie réelle.
+dist = racineServie();
+aThemeSombre =
+  Boolean(dist) && /prefers-color-scheme|data-theme/.test(readFileSync(join(dist, "index.html"), "utf8"));
+
+if (scripts.test) commande("tests-projet", "npm", ["test"], {}, { testsUnitaires: true });
+if (scripts["test:regles"])
+  commande("tests-des-regles", "npm", ["run", "test:regles"], {}, { testsUnitaires: true });
 // Demande : pendant une livraison, il faut un test d'acceptation étiqueté « demande:<nom> » qui prouve que la demande est remplie.
 if (existsSync(join(projet, ".livraison-en-cours"))) {
   const lireTests = (dir) =>
@@ -347,21 +428,61 @@ if (existsSync(join(projet, ".livraison-en-cours"))) {
         ),
       ]
     : [];
-  if (fichiersDemande.length > 0 && !scripts["test:regles"] && !scripts.check && !scripts.test)
+  if (fichiersDemande.length === 0) {
     enregistrer(
       "test d'acceptation de la demande",
       false,
-      "le test « demande:<nom> » existe mais aucun script (test:regles, check ou test) ne l'exécute",
-      "non_execute",
-    );
-  else
-    enregistrer(
-      "test d'acceptation de la demande",
-      fichiersDemande.length > 0,
       modifies === null
         ? "impossible de vérifier (pas de dépôt Git) : ajouter un test « demande:<nom> » modifié pendant la livraison"
         : "aucun test « demande:<nom> » nouveau ou modifié pendant cette livraison ne prouve la demande",
     );
+  } else if (!["test:acceptance", "test:regles", "test"].some((n) => scripts[n])) {
+    enregistrer(
+      "test d'acceptation de la demande",
+      false,
+      "un test « demande:<nom> » existe, mais aucun script (test:acceptance, test:regles ou test) ne l'exécute : son exécution ne peut pas être prouvée",
+      "non_execute",
+    );
+  } else {
+    const etiquettes = [
+      ...new Set(
+        fichiersDemande.flatMap((f) => {
+          const c = readFileSync(join(projet, f), "utf8");
+          return [...c.matchAll(/demande:[\w-]+/g)].map((m) => m[0]);
+        }),
+      ),
+    ];
+    // Script dédié de préférence ; sinon celui des règles, sinon « test » (compatibilité des projets existants).
+    const scriptAcceptation = ["test:acceptance", "test:regles", "test"].find((n) => scripts[n]);
+    commande("execution-test-acceptation", "npm", ["run", scriptAcceptation], {}, { testsUnitaires: true });
+    const execution = controles.find((c) => c.nom === "execution-test-acceptation");
+    const journalTest = readFileSync(join(rapportDir, "execution-test-acceptation.log"), "utf8");
+    // Preuve d'exécution : le lanceur a écrit l'étiquette du test (node --test, jest en mode détaillé) ou le chemin du
+    // fichier de test (vitest, jest, mocha) dans sa sortie. Un script qui rend 0 sans rien lancer n'écrit ni l'un ni l'autre.
+    const fichiersNonVus = fichiersDemande.filter((f) => {
+      const nom = f.replace(/\\/g, "/");
+      const base = nom.split("/").pop();
+      const etiquettesDuFichier = [...readFileSync(join(projet, f), "utf8").matchAll(/demande:[\w-]+/g)].map(
+        (m) => m[0],
+      );
+      return !(
+        journalTest.includes(nom) ||
+        journalTest.includes(base) ||
+        etiquettesDuFichier.some((e) => journalTest.includes(e))
+      );
+    });
+    const preuveVisible = execution?.ok && etiquettes.length > 0 && fichiersNonVus.length === 0;
+    enregistrer(
+      "test d'acceptation de la demande",
+      Boolean(preuveVisible),
+      preuveVisible
+        ? `test(s) ${etiquettes.join(", ")} modifié(s) et exécuté(s) par « ${scriptAcceptation} » (preuve dans execution-test-acceptation.log)`
+        : execution?.ok
+          ? `le script « ${scriptAcceptation} » a rendu 0 mais sa sortie ne montre ni l'étiquette ni le fichier de : ${fichiersNonVus.join(", ")} (voir execution-test-acceptation.log)`
+          : `le script « ${scriptAcceptation} » a échoué (voir execution-test-acceptation.log)`,
+      preuveVisible ? "reussi" : "non_execute",
+    );
+  }
 }
 if (aPlaywright) commande("tests-bout-en-bout", "npx", ["playwright", "test"]);
 else enregistrer("tests-bout-en-bout", true, "pas de Playwright : non applicable", "sans_objet");
@@ -370,8 +491,15 @@ else enregistrer("tests-bout-en-bout", true, "pas de Playwright : non applicable
 function fichiers(dir, out = []) {
   for (const f of readdirSync(dir)) {
     const p = join(dir, f);
-    if (statSync(p).isDirectory()) fichiers(p, out);
-    else if ([".html", ".js", ".txt", ".json", ".xml"].includes(extname(p))) out.push(p);
+    let info;
+    try {
+      info = lstatSync(p);
+    } catch {
+      continue;
+    }
+    if (info.isSymbolicLink()) continue;
+    if (info.isDirectory()) fichiers(p, out);
+    else if (info.isFile() && [".html", ".js", ".txt", ".json", ".xml"].includes(extname(p))) out.push(p);
   }
   return out;
 }
@@ -428,7 +556,14 @@ else {
       })
       .catch(() => chromium.launch());
     const largeurs = rapide ? [320, 390, 1024] : (regles?.largeurs ?? [320, 360, 390, 768, 1024, 1440]);
-    const routes = regles?.routes ?? routesDetectees(dist);
+    // « routes » renseigné = liste explicite des pages contrôlées ; sinon détection automatique, plafonnée.
+    const explicites = Array.isArray(regles?.routes) && regles.routes.length > 0;
+    const detection = explicites ? null : routesDetectees(dist);
+    const routes = explicites ? [...new Set(regles.routes)] : detection.routes;
+    const noteRoutes =
+      detection && detection.tronque
+        ? ` ; ${detection.total} pages détectées, ${routes.length} contrôlées (plafond ${ROUTES_MAX}) : lister les pages importantes dans « routes »`
+        : "";
     const problemes = [];
     let textesMesures = 0;
     let textesNonMesurables = 0;
@@ -697,7 +832,7 @@ else {
         ")",
       problemes.length === 0,
       problemes.slice(0, 6).join(" ;; ") +
-        ` [${textesMesures} zones de texte mesurées, ${textesNonMesurables} contrastes non mesurables (fond en image)]`,
+        ` [${textesMesures} zones de texte mesurées, ${textesNonMesurables} contrastes non mesurables (fond en image)${noteRoutes}]`,
     );
   } catch (e) {
     enregistrer(

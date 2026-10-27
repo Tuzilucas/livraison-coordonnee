@@ -1,4 +1,4 @@
-# Notice d'utilisation — plugin `livraison-coordonnee` (version 1.6.0)
+# Notice d'utilisation — plugin `livraison-coordonnee` (version 1.6.1)
 
 _[English version](NOTICE.en.md)_
 
@@ -87,12 +87,12 @@ s'est arrêté grâce à `.livraison-etat.json`.
 
 | Vérification                                   | Ce qui est contrôlé                                                                                      |
 | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| Règles lues                                    | `CLAUDE.md` est présent et ses règles sont classées.                                                      |
+| Règles lues                                    | `CLAUDE.md` est présent, ses règles sont classées, et le fichier de règles porte l'empreinte du `CLAUDE.md` actuel (sinon : relancer `regles.mjs`). |
 | Vérifications du projet                        | `npm run check` (ou équivalent) passe.                                                                    |
 | Couverture des règles                          | Chaque règle importante a un test étiqueté `regle:<identifiant>`.                                        |
 | Données                                        | La validation des données passe, si le projet en a une.                                                   |
 | Construction                                   | `npm run build` passe, si le projet en a une.                                                             |
-| Tests des règles et de la demande              | `npm run test:regles` passe et le test `demande:` est nouveau ou modifié pendant la livraison.            |
+| Tests des règles et de la demande              | `npm run test:regles` passe ; le test `demande:` est nouveau ou modifié pendant la livraison ET réellement exécuté (sa sortie montre l'étiquette ou le fichier), par `test:acceptance`, sinon `test:regles`, sinon `test`. |
 | Navigation de bout en bout                     | Les tests Playwright passent, s'il y en a.                                                                |
 | Interdits                                      | Aucun motif interdit (secret, donnée interne) dans les fichiers construits.                              |
 | Affichage                                      | À 320, 360, 390, 768, 1024 et 1440 px (et en thème sombre s'il est déclaré) : pas de défilement horizontal, pas de texte hors écran ni superposé, cibles tactiles d'au moins 24 px, aucune erreur JavaScript. |
@@ -130,7 +130,7 @@ Les fichiers « Non » sont ajoutés automatiquement au `.gitignore` du projet.
 | `LIVRAISON_NAVIGATEUR`   | Chrome, puis Edge           | Forcer `chrome` ou `msedge` pour les captures.  |
 | `LIVRAISON_LANGUE`       | `fr`                        | Langue des résumés et messages : `fr`, `en`, `es`, `de`, `it`. Sinon `"langue"` du fichier de règles (`regles.mjs --langue=xx`). |
 
-Options de `.claude/regles-livraison.json` : `routes` (pages à contrôler), `largeurs`, `interdits`,
+Options de `.claude/regles-livraison.json` : `routes` (liste explicite des pages à contrôler ; vide = détection automatique à toute profondeur, plafonnée à 40 pages, le rapport l'indique), `largeurs`, `interdits`,
 `controles` et `revue_humaine` (mots-clés qui classent une règle), `theme_sombre`.
 
 ## 9. Questions fréquentes
@@ -168,8 +168,8 @@ hook d'arrêt ne relancera plus la porte.
 - Les tests écrits par le plugin doivent être relus au début.
 - Le contrôle d'affichage détecte des défauts mesurables (débordement, superposition, cibles trop
   petites), pas le goût ni la pertinence des textes.
-- La détection automatique des pages s'arrête à deux niveaux de dossiers ; au-delà, lister les pages dans
-  `routes` de `.claude/regles-livraison.json`. Une page non listée n'est pas contrôlée.
+- La détection automatique des pages est plafonnée à 40 (largeur d'abord) ; au-delà, lister les pages importantes
+  dans `routes` de `.claude/regles-livraison.json`. Dès que `routes` est renseigné, seules ces pages sont contrôlées.
 - Le contraste n'est mesuré que sur fond de couleur unie ; les textes sur image ou dégradé sont comptés
   « non mesurables », jamais validés.
 - Le navigateur de contrôle a été exercé dans un environnement de développement ; Chrome et Edge sur
@@ -179,7 +179,7 @@ hook d'arrêt ne relancera plus la porte.
 
 ## 11. Tester le plugin lui-même
 
-`npm test` dans le dossier du plugin lance 39 tests sur des projets temporaires (créés dans le dossier
+`npm test` dans le dossier du plugin lance la suite de tests sur des projets temporaires (créés dans le dossier
 temporaire du système, supprimés ensuite) : projet valide, test ou build en échec, erreur JavaScript,
 configuration invalide, `package.json` absent ou malformé, deux portes simultanées, traversée de
 répertoires, rapports absents ou corrompus, épuisement des essais, projet sans tests, build périmé en mode
