@@ -1,6 +1,6 @@
 {
   "name": "livraison-coordonnee",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "private": true,
   "description": "Plugin Claude Code : une commande livre une demande avec test d'acceptation et porte de qualité.",
   "license": "MIT",
