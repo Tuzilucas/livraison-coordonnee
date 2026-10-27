@@ -164,6 +164,19 @@ test("15b. test d'acceptation exécuté par le script dédié : accepté", () =>
   assert.equal(controle(r.rapport, "execution-test-acceptation").ok, true);
 });
 
+test("15c. un script test:acceptance qui réussit sans exécuter le test ne suffit pas", () => {
+  const dir = projet({ testAcceptance: 'node -e "process.exit(0)"', git: true });
+  writeFileSync(join(dir, ".livraison-en-cours"), "0");
+  mkdirSync(join(dir, "tests"), { recursive: true });
+  writeFileSync(join(dir, "tests", "demande.test.mjs"), "// demande:bouton\n");
+  const r = lancerPorte(dir);
+  assert.equal(r.code, 1);
+  const c = controle(r.rapport, "test d'acceptation");
+  assert.equal(c.ok, false);
+  assert.equal(c.statut, "non_execute");
+  assert.match(c.detail, /n'a pas fourni de preuve d'exécution/);
+});
+
 test("B. un contrôle « sans objet » ne compte pas dans la fiabilité et n'est pas affiché comme réussi", () => {
   const r = lancerPorte(projet()); // ni build ni Playwright : deux contrôles sans objet
   const sansObjet = r.rapport.controles.filter((c) => c.statut === "sans_objet");
