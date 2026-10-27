@@ -3,6 +3,7 @@
 // Usage : node gate.mjs <dossier-du-projet>
 // Sortie : rapport-livraison/rapport.json et rapport-livraison/*.log ; code 0 seulement si tout passe.
 import { execFileSync, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
   closeSync,
   existsSync,
@@ -203,17 +204,19 @@ else if (lireJson(reglesFile).erreur)
 else {
   regles = lireJson(reglesFile).valeur;
   const norm = (s) => s.trim().toLowerCase();
-  const titres = readFileSync(claudeMd, "utf8")
+  const texteClaude = readFileSync(claudeMd, "utf8");
+  const titres = texteClaude
     .split("\n")
     .filter((l) => l.startsWith("## "))
     .map((l) => norm(l.slice(3)));
   const couverts = (regles.sections_claude_md ?? []).map(norm);
   const manquants = titres.filter((t) => !couverts.includes(t));
-  enregistrer(
-    "lecture-regles",
-    manquants.length === 0,
-    manquants.length ? `sections non traitées : ${manquants.join(", ")}` : "",
-  );
+  const hashActuel = createHash("sha256").update(texteClaude).digest("hex");
+  const reglesPerimees = typeof regles.source_sha256 !== "string" || regles.source_sha256 !== hashActuel;
+  const problemesRegles = [];
+  if (manquants.length) problemesRegles.push(`sections non traitées : ${manquants.join(", ")}`);
+  if (reglesPerimees) problemesRegles.push("configuration périmée : CLAUDE.md a changé ou la configuration n'a pas d'empreinte fiable ; relancer scripts/regles.mjs");
+  enregistrer("lecture-regles", problemesRegles.length === 0, problemesRegles.join(" ; "));
 }
 
 // Profil du projet : la porte ne fait que ce que le projet sait faire. Une étape absente est notée « non applicable ».
