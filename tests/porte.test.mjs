@@ -253,6 +253,24 @@ test("15c. un script test:acceptance qui réussit sans exécuter le test ne suff
   assert.match(c.detail, /ne montre ni l'étiquette ni le fichier/);
 });
 
+test("E. environnement des commandes : CI=1 pour les lanceurs de tests, jamais pour le build ni Playwright", () => {
+  // Le build doit voir l'environnement du projet tel quel (un vrai site lit CI pour choisir son navigateur Playwright).
+  const dir = projet({
+    build: 'node -e "process.exit(process.env.CI ? 7 : 0)"',
+    test: 'node -e "process.exit(process.env.CI ? 0 : 8)"',
+    testRegles: 'node -e "process.exit(process.env.NODE_TEST_CONTEXT ? 9 : 0)"',
+  });
+  const r = lancerPorte(dir, [], { CI: "" });
+  assert.equal(r.code, 0, r.stderr + r.stdout);
+  assert.equal(controle(r.rapport, "construction").ok, true, "le build ne doit pas recevoir CI=1");
+  assert.equal(controle(r.rapport, "tests-projet").ok, true, "npm test doit recevoir CI=1");
+  assert.equal(
+    controle(r.rapport, "tests-des-regles").ok,
+    true,
+    "NODE_TEST_CONTEXT ne doit pas être transmis",
+  );
+});
+
 test("B. un contrôle « sans objet » ne compte pas dans la fiabilité et n'est pas affiché comme réussi", () => {
   const r = lancerPorte(projet()); // ni build ni Playwright : deux contrôles sans objet
   const sansObjet = r.rapport.controles.filter((c) => c.statut === "sans_objet");

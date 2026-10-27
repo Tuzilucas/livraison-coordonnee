@@ -182,18 +182,20 @@ process.on("uncaughtException", (e) => conclure(e));
 process.on("unhandledRejection", (e) => conclure(e));
 
 // 1. Fonctionnement : tests, construction et contrôle du projet, tels qu'ils sont définis dans le dépôt.
-// Environnement des commandes enfants : CI=1 désactive les modes « veille » (vitest, jest) qui ne rendraient jamais la main ;
-// les variables du lanceur de tests de Node (NODE_TEST_CONTEXT) ne sont pas transmises, sinon un « node --test » enfant
-// se croit sous-processus d'un autre lanceur et n'écrit plus sa sortie normale.
-function environnementEnfant(env = {}) {
-  const base = { ...process.env, CI: "1", ...env };
+// Environnement des commandes enfants : les variables du lanceur de tests de Node (NODE_TEST_CONTEXT) ne sont pas
+// transmises, sinon un « node --test » enfant se croit sous-processus d'un autre lanceur et n'écrit plus sa sortie
+// normale. CI=1 n'est posé que pour les lanceurs de tests unitaires (vitest, jest…), dont le mode « veille » ne
+// rendrait jamais la main ; pas pour le build ni Playwright, dont la configuration des projets lit souvent CI
+// (navigateur, serveur, nouvelles tentatives) et changerait de comportement.
+function environnementEnfant(env = {}, { testsUnitaires = false } = {}) {
+  const base = { ...process.env, ...(testsUnitaires ? { CI: "1" } : {}), ...env };
   for (const k of Object.keys(base)) if (k.startsWith("NODE_TEST_")) delete base[k];
   return base;
 }
-function commande(nom, cmd, args, env = {}) {
+function commande(nom, cmd, args, env = {}, options = {}) {
   const r = spawnSync(cmd, args, {
     cwd: projet,
-    env: environnementEnfant(env),
+    env: environnementEnfant(env, options),
     encoding: "utf8",
     maxBuffer: 256 * 1024 * 1024,
   });
@@ -387,8 +389,9 @@ dist = racineServie();
 aThemeSombre =
   Boolean(dist) && /prefers-color-scheme|data-theme/.test(readFileSync(join(dist, "index.html"), "utf8"));
 
-if (scripts.test) commande("tests-projet", "npm", ["test"]);
-if (scripts["test:regles"]) commande("tests-des-regles", "npm", ["run", "test:regles"]);
+if (scripts.test) commande("tests-projet", "npm", ["test"], {}, { testsUnitaires: true });
+if (scripts["test:regles"])
+  commande("tests-des-regles", "npm", ["run", "test:regles"], {}, { testsUnitaires: true });
 // Demande : pendant une livraison, il faut un test d'acceptation étiqueté « demande:<nom> » qui prouve que la demande est remplie.
 if (existsSync(join(projet, ".livraison-en-cours"))) {
   const lireTests = (dir) =>
@@ -451,7 +454,7 @@ if (existsSync(join(projet, ".livraison-en-cours"))) {
     ];
     // Script dédié de préférence ; sinon celui des règles, sinon « test » (compatibilité des projets existants).
     const scriptAcceptation = ["test:acceptance", "test:regles", "test"].find((n) => scripts[n]);
-    commande("execution-test-acceptation", "npm", ["run", scriptAcceptation]);
+    commande("execution-test-acceptation", "npm", ["run", scriptAcceptation], {}, { testsUnitaires: true });
     const execution = controles.find((c) => c.nom === "execution-test-acceptation");
     const journalTest = readFileSync(join(rapportDir, "execution-test-acceptation.log"), "utf8");
     // Preuve d'exécution : le lanceur a écrit l'étiquette du test (node --test, jest en mode détaillé) ou le chemin du
