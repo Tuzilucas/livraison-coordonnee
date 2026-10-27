@@ -7,6 +7,7 @@ import { createHash } from "node:crypto";
 import {
   closeSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   openSync,
   readFileSync,
@@ -237,20 +238,21 @@ function racineServie() {
     if (existsSync(join(projet, d, "index.html"))) return join(projet, d);
   return null;
 }
-// Routes détectées : chaque dossier qui contient un index.html (au plus deux niveaux).
+// Routes détectées à toute profondeur. lstatSync évite de suivre les liens symboliques hors du livrable.
 function routesDetectees(racine) {
   if (!racine) return ["/"];
   const routes = [];
-  const parcourir = (dir, profondeur, chemin) => {
+  const parcourir = (dir, chemin) => {
     if (existsSync(join(dir, "index.html"))) routes.push(chemin);
-    if (profondeur >= 2) return;
     for (const f of readdirSync(dir)) {
+      if (f.startsWith(".") || f === "node_modules") continue;
       const p = join(dir, f);
-      if (statSync(p).isDirectory() && !f.startsWith(".") && f !== "node_modules")
-        parcourir(p, profondeur + 1, `${chemin}${f}/`);
+      try {
+        if (lstatSync(p).isDirectory()) parcourir(p, `${chemin}${f}/`);
+      } catch {}
     }
   };
-  parcourir(racine, 0, "/");
+  parcourir(racine, "/");
   return routes.length ? routes : ["/"];
 }
 let dist = racineServie();
@@ -440,8 +442,11 @@ else enregistrer("tests-bout-en-bout", true, "pas de Playwright : non applicable
 function fichiers(dir, out = []) {
   for (const f of readdirSync(dir)) {
     const p = join(dir, f);
-    if (statSync(p).isDirectory()) fichiers(p, out);
-    else if ([".html", ".js", ".txt", ".json", ".xml"].includes(extname(p))) out.push(p);
+    let info;
+    try { info = lstatSync(p); } catch { continue; }
+    if (info.isSymbolicLink()) continue;
+    if (info.isDirectory()) fichiers(p, out);
+    else if (info.isFile() && [".html", ".js", ".txt", ".json", ".xml"].includes(extname(p))) out.push(p);
   }
   return out;
 }
@@ -498,7 +503,9 @@ else {
       })
       .catch(() => chromium.launch());
     const largeurs = rapide ? [320, 390, 1024] : (regles?.largeurs ?? [320, 360, 390, 768, 1024, 1440]);
-    const routes = regles?.routes ?? routesDetectees(dist);
+    const routes = regles?.routes_explicites === true
+      ? (regles.routes?.length ? regles.routes : ["/"])
+      : [...new Set([...routesDetectees(dist), ...(regles?.routes ?? [])])];
     const problemes = [];
     let textesMesures = 0;
     let textesNonMesurables = 0;
