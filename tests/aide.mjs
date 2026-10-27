@@ -40,6 +40,7 @@ export function creerProjet(options = {}) {
     if (o.build) scripts.build = o.build;
     if (o.test) scripts.test = o.test;
     if (o.testRegles) scripts["test:regles"] = o.testRegles;
+    if (o.testAcceptance) scripts["test:acceptance"] = o.testAcceptance;
     writeFileSync(
       join(dir, "package.json"),
       typeof o.pkg === "string"
