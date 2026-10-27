@@ -310,6 +310,7 @@ if (!scripts.build) {
     NEXT_PUBLIC_BASE_PATH: "",
   });
 }
+if (scripts.test) commande("tests-projet", "npm", ["test"]);
 if (scripts["test:regles"]) commande("tests-des-regles", "npm", ["run", "test:regles"]);
 // Demande : pendant une livraison, il faut un test d'acceptation étiqueté « demande:<nom> » qui prouve que la demande est remplie.
 if (existsSync(join(projet, ".livraison-en-cours"))) {
@@ -347,21 +348,29 @@ if (existsSync(join(projet, ".livraison-en-cours"))) {
         ),
       ]
     : [];
-  if (fichiersDemande.length > 0 && !scripts["test:regles"] && !scripts.check && !scripts.test)
+  if (fichiersDemande.length === 0) {
     enregistrer(
       "test d'acceptation de la demande",
       false,
-      "le test « demande:<nom> » existe mais aucun script (test:regles, check ou test) ne l'exécute",
-      "non_execute",
-    );
-  else
-    enregistrer(
-      "test d'acceptation de la demande",
-      fichiersDemande.length > 0,
       modifies === null
         ? "impossible de vérifier (pas de dépôt Git) : ajouter un test « demande:<nom> » modifié pendant la livraison"
         : "aucun test « demande:<nom> » nouveau ou modifié pendant cette livraison ne prouve la demande",
     );
+  } else if (!scripts["test:acceptance"]) {
+    enregistrer(
+      "test d'acceptation de la demande",
+      false,
+      "un test « demande:<nom> » existe, mais le script dédié « test:acceptance » est absent : son exécution ne peut pas être prouvée",
+      "non_execute",
+    );
+  } else {
+    commande("execution-test-acceptation", "npm", ["run", "test:acceptance"]);
+    enregistrer(
+      "test d'acceptation de la demande",
+      true,
+      "test « demande:<nom> » modifié pendant cette livraison ; script test:acceptance exécuté (voir execution-test-acceptation.log)",
+    );
+  }
 }
 if (aPlaywright) commande("tests-bout-en-bout", "npx", ["playwright", "test"]);
 else enregistrer("tests-bout-en-bout", true, "pas de Playwright : non applicable", "sans_objet");
