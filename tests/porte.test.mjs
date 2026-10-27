@@ -46,6 +46,21 @@ test("3. build en échec : refus", () => {
   assert.equal(controle(r.rapport, "construction").ok, false);
 });
 
+test("3b. le contrôle visuel porte sur la sortie du build, pas sur public/ obsolète", () => {
+  const dir = projet({ build: "node build.mjs" });
+  writeFileSync(
+    join(dir, "build.mjs"),
+    `import { mkdirSync, writeFileSync } from "node:fs";
+mkdirSync("out", { recursive: true });
+writeFileSync("out/index.html", '<!doctype html><html><body><script>throw new Error("erreur-sortie-build")</script></body></html>');`,
+  );
+  const r = lancerPorte(dir);
+  assert.equal(r.code, 1);
+  const a = controle(r.rapport, "affichage");
+  assert.equal(a.ok, false);
+  assert.match(a.detail, /erreur-sortie-build/);
+});
+
 test("4. erreur JavaScript dans la page : refus du contrôle d'affichage", () => {
   const r = lancerPorte(projet({ script: "<script>throw new Error('cassé')</script>" }));
   assert.equal(r.code, 1);
