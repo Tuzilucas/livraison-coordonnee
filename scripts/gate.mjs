@@ -404,11 +404,26 @@ if (existsSync(join(projet, ".livraison-en-cours"))) {
       "non_execute",
     );
   } else {
+    const etiquettes = [
+      ...new Set(
+        fichiersDemande.flatMap((f) => {
+          const c = readFileSync(join(projet, f), "utf8");
+          return [...c.matchAll(/demande:[\\w-]+/g)].map((m) => m[0]);
+        }),
+      ),
+    ];
     commande("execution-test-acceptation", "npm", ["run", "test:acceptance"]);
+    const execution = controles.find((c) => c.nom === "execution-test-acceptation");
+    const journalTest = readFileSync(join(rapportDir, "execution-test-acceptation.log"), "utf8");
+    const etiquettesAbsentes = etiquettes.filter((e) => !journalTest.includes(e));
+    const preuveVisible = execution?.ok && etiquettes.length > 0 && etiquettesAbsentes.length === 0;
     enregistrer(
       "test d'acceptation de la demande",
-      true,
-      "test « demande:<nom> » modifié pendant cette livraison ; script test:acceptance exécuté (voir execution-test-acceptation.log)",
+      Boolean(preuveVisible),
+      preuveVisible
+        ? `test(s) ${etiquettes.join(", ")} modifié(s) et retrouvé(s) dans la sortie du script test:acceptance`
+        : `le script test:acceptance n'a pas fourni de preuve d'exécution pour : ${etiquettesAbsentes.join(", ") || "aucune étiquette demande:<nom> détectée"} (voir execution-test-acceptation.log)`,
+      preuveVisible ? "reussi" : "non_execute",
     );
   }
 }
