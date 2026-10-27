@@ -93,6 +93,20 @@ const PHRASES = {
     de: "Die Website wird fehlerfrei gebaut",
     it: "Il sito viene costruito senza errori",
   },
+  "tests-projet": {
+    fr: "Les tests du projet passent",
+    en: "The project tests pass",
+    es: "Las pruebas del proyecto pasan",
+    de: "Die Projekttests bestehen",
+    it: "I test del progetto passano",
+  },
+  "execution-test-acceptation": {
+    fr: "Le script du test d'acceptation s'exécute sans erreur",
+    en: "The acceptance-test script runs without error",
+    es: "El script de la prueba de aceptación se ejecuta sin error",
+    de: "Das Skript des Abnahmetests läuft fehlerfrei",
+    it: "Lo script del test di accettazione viene eseguito senza errori",
+  },
   "tests-des-regles": {
     fr: "Les tests des règles passent",
     en: "The rule tests pass",

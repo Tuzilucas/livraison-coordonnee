@@ -13,6 +13,8 @@ const CLES = [
   "couverture des règles de CLAUDE.md",
   "donnees",
   "construction",
+  "tests-projet",
+  "execution-test-acceptation",
   "tests-des-regles",
   "tests-bout-en-bout",
   "affichage",
