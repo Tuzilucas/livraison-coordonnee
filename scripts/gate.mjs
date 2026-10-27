@@ -76,7 +76,9 @@ const verrou = join(projet, ".livraison-porte.lock");
       acquis = true;
     } catch (e) {
       if (fd !== undefined) {
-        try { closeSync(fd); } catch {}
+        try {
+          closeSync(fd);
+        } catch {}
       }
       if (e.code !== "EEXIST") throw e;
       let ancien = NaN;
@@ -90,7 +92,9 @@ const verrou = join(projet, ".livraison-porte.lock");
         process.exit(2);
       }
       // Verrou périmé : le retirer puis retenter une acquisition atomique.
-      try { unlinkSync(verrou); } catch (erreur) {
+      try {
+        unlinkSync(verrou);
+      } catch (erreur) {
         if (erreur.code !== "ENOENT") throw erreur;
       }
     }
@@ -178,10 +182,18 @@ process.on("uncaughtException", (e) => conclure(e));
 process.on("unhandledRejection", (e) => conclure(e));
 
 // 1. Fonctionnement : tests, construction et contrôle du projet, tels qu'ils sont définis dans le dépôt.
+// Environnement des commandes enfants : CI=1 désactive les modes « veille » (vitest, jest) qui ne rendraient jamais la main ;
+// les variables du lanceur de tests de Node (NODE_TEST_CONTEXT) ne sont pas transmises, sinon un « node --test » enfant
+// se croit sous-processus d'un autre lanceur et n'écrit plus sa sortie normale.
+function environnementEnfant(env = {}) {
+  const base = { ...process.env, CI: "1", ...env };
+  for (const k of Object.keys(base)) if (k.startsWith("NODE_TEST_")) delete base[k];
+  return base;
+}
 function commande(nom, cmd, args, env = {}) {
   const r = spawnSync(cmd, args, {
     cwd: projet,
-    env: { ...process.env, ...env },
+    env: environnementEnfant(env),
     encoding: "utf8",
     maxBuffer: 256 * 1024 * 1024,
   });
@@ -216,7 +228,10 @@ else {
   const reglesPerimees = typeof regles.source_sha256 !== "string" || regles.source_sha256 !== hashActuel;
   const problemesRegles = [];
   if (manquants.length) problemesRegles.push(`sections non traitées : ${manquants.join(", ")}`);
-  if (reglesPerimees) problemesRegles.push("configuration périmée : CLAUDE.md a changé ou la configuration n'a pas d'empreinte fiable ; relancer scripts/regles.mjs");
+  if (reglesPerimees)
+    problemesRegles.push(
+      "configuration périmée : CLAUDE.md a changé ou la configuration n'a pas d'empreinte fiable ; relancer scripts/regles.mjs",
+    );
   enregistrer("lecture-regles", problemesRegles.length === 0, problemesRegles.join(" ; "));
 }
 
@@ -238,22 +253,36 @@ function racineServie() {
     if (existsSync(join(projet, d, "index.html"))) return join(projet, d);
   return null;
 }
-// Routes détectées à toute profondeur. lstatSync évite de suivre les liens symboliques hors du livrable.
-function routesDetectees(racine) {
-  if (!racine) return ["/"];
+// Routes détectées à toute profondeur, largeur d'abord (les pages proches de l'accueil passent en premier), plafonnées :
+// un site de 900 pages ne peut pas être visité page par page à six largeurs. lstatSync évite de suivre les liens
+// symboliques hors du livrable. Au-delà du plafond, lister les pages à contrôler dans « routes ».
+const ROUTES_MAX = 40;
+function routesDetectees(racine, max = ROUTES_MAX) {
+  if (!racine) return { routes: ["/"], total: 1, tronque: false };
   const routes = [];
-  const parcourir = (dir, chemin) => {
-    if (existsSync(join(dir, "index.html"))) routes.push(chemin);
-    for (const f of readdirSync(dir)) {
+  let total = 0;
+  const file = [[racine, "/"]];
+  while (file.length) {
+    const [dir, chemin] = file.shift();
+    if (existsSync(join(dir, "index.html"))) {
+      total++;
+      if (routes.length < max) routes.push(chemin);
+    }
+    let entrees = [];
+    try {
+      entrees = readdirSync(dir).sort();
+    } catch {
+      continue;
+    }
+    for (const f of entrees) {
       if (f.startsWith(".") || f === "node_modules") continue;
       const p = join(dir, f);
       try {
-        if (lstatSync(p).isDirectory()) parcourir(p, `${chemin}${f}/`);
+        if (lstatSync(p).isDirectory()) file.push([p, `${chemin}${f}/`]);
       } catch {}
     }
-  };
-  parcourir(racine, "/");
-  return routes.length ? routes : ["/"];
+  }
+  return { routes: routes.length ? routes : ["/"], total: Math.max(total, 1), tronque: total > max };
 }
 let dist = racineServie();
 // Thème sombre : contrôlé seulement si le site déclare un mécanisme de thème (sinon il n'y a rien à vérifier).
@@ -404,11 +433,11 @@ if (existsSync(join(projet, ".livraison-en-cours"))) {
         ? "impossible de vérifier (pas de dépôt Git) : ajouter un test « demande:<nom> » modifié pendant la livraison"
         : "aucun test « demande:<nom> » nouveau ou modifié pendant cette livraison ne prouve la demande",
     );
-  } else if (!scripts["test:acceptance"]) {
+  } else if (!["test:acceptance", "test:regles", "test"].some((n) => scripts[n])) {
     enregistrer(
       "test d'acceptation de la demande",
       false,
-      "un test « demande:<nom> » existe, mais le script dédié « test:acceptance » est absent : son exécution ne peut pas être prouvée",
+      "un test « demande:<nom> » existe, mais aucun script (test:acceptance, test:regles ou test) ne l'exécute : son exécution ne peut pas être prouvée",
       "non_execute",
     );
   } else {
@@ -420,17 +449,34 @@ if (existsSync(join(projet, ".livraison-en-cours"))) {
         }),
       ),
     ];
-    commande("execution-test-acceptation", "npm", ["run", "test:acceptance"]);
+    // Script dédié de préférence ; sinon celui des règles, sinon « test » (compatibilité des projets existants).
+    const scriptAcceptation = ["test:acceptance", "test:regles", "test"].find((n) => scripts[n]);
+    commande("execution-test-acceptation", "npm", ["run", scriptAcceptation]);
     const execution = controles.find((c) => c.nom === "execution-test-acceptation");
     const journalTest = readFileSync(join(rapportDir, "execution-test-acceptation.log"), "utf8");
-    const etiquettesAbsentes = etiquettes.filter((e) => !journalTest.includes(e));
-    const preuveVisible = execution?.ok && etiquettes.length > 0 && etiquettesAbsentes.length === 0;
+    // Preuve d'exécution : le lanceur a écrit l'étiquette du test (node --test, jest en mode détaillé) ou le chemin du
+    // fichier de test (vitest, jest, mocha) dans sa sortie. Un script qui rend 0 sans rien lancer n'écrit ni l'un ni l'autre.
+    const fichiersNonVus = fichiersDemande.filter((f) => {
+      const nom = f.replace(/\\/g, "/");
+      const base = nom.split("/").pop();
+      const etiquettesDuFichier = [...readFileSync(join(projet, f), "utf8").matchAll(/demande:[\w-]+/g)].map(
+        (m) => m[0],
+      );
+      return !(
+        journalTest.includes(nom) ||
+        journalTest.includes(base) ||
+        etiquettesDuFichier.some((e) => journalTest.includes(e))
+      );
+    });
+    const preuveVisible = execution?.ok && etiquettes.length > 0 && fichiersNonVus.length === 0;
     enregistrer(
       "test d'acceptation de la demande",
       Boolean(preuveVisible),
       preuveVisible
-        ? `test(s) ${etiquettes.join(", ")} modifié(s) et retrouvé(s) dans la sortie du script test:acceptance`
-        : `le script test:acceptance n'a pas fourni de preuve d'exécution pour : ${etiquettesAbsentes.join(", ") || "aucune étiquette demande:<nom> détectée"} (voir execution-test-acceptation.log)`,
+        ? `test(s) ${etiquettes.join(", ")} modifié(s) et exécuté(s) par « ${scriptAcceptation} » (preuve dans execution-test-acceptation.log)`
+        : execution?.ok
+          ? `le script « ${scriptAcceptation} » a rendu 0 mais sa sortie ne montre ni l'étiquette ni le fichier de : ${fichiersNonVus.join(", ")} (voir execution-test-acceptation.log)`
+          : `le script « ${scriptAcceptation} » a échoué (voir execution-test-acceptation.log)`,
       preuveVisible ? "reussi" : "non_execute",
     );
   }
@@ -443,7 +489,11 @@ function fichiers(dir, out = []) {
   for (const f of readdirSync(dir)) {
     const p = join(dir, f);
     let info;
-    try { info = lstatSync(p); } catch { continue; }
+    try {
+      info = lstatSync(p);
+    } catch {
+      continue;
+    }
     if (info.isSymbolicLink()) continue;
     if (info.isDirectory()) fichiers(p, out);
     else if (info.isFile() && [".html", ".js", ".txt", ".json", ".xml"].includes(extname(p))) out.push(p);
@@ -503,9 +553,14 @@ else {
       })
       .catch(() => chromium.launch());
     const largeurs = rapide ? [320, 390, 1024] : (regles?.largeurs ?? [320, 360, 390, 768, 1024, 1440]);
-    const routes = regles?.routes_explicites === true
-      ? (regles.routes?.length ? regles.routes : ["/"])
-      : [...new Set([...routesDetectees(dist), ...(regles?.routes ?? [])])];
+    // « routes » renseigné = liste explicite des pages contrôlées ; sinon détection automatique, plafonnée.
+    const explicites = Array.isArray(regles?.routes) && regles.routes.length > 0;
+    const detection = explicites ? null : routesDetectees(dist);
+    const routes = explicites ? [...new Set(regles.routes)] : detection.routes;
+    const noteRoutes =
+      detection && detection.tronque
+        ? ` ; ${detection.total} pages détectées, ${routes.length} contrôlées (plafond ${ROUTES_MAX}) : lister les pages importantes dans « routes »`
+        : "";
     const problemes = [];
     let textesMesures = 0;
     let textesNonMesurables = 0;
@@ -774,7 +829,7 @@ else {
         ")",
       problemes.length === 0,
       problemes.slice(0, 6).join(" ;; ") +
-        ` [${textesMesures} zones de texte mesurées, ${textesNonMesurables} contrastes non mesurables (fond en image)]`,
+        ` [${textesMesures} zones de texte mesurées, ${textesNonMesurables} contrastes non mesurables (fond en image)${noteRoutes}]`,
     );
   } catch (e) {
     enregistrer(

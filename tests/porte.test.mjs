@@ -25,7 +25,10 @@ test("1. projet valide : porte verte, rapport et résumé cohérents", () => {
 
 test("1b. une modification de CLAUDE.md invalide la configuration de règles préexistante", () => {
   const dir = projet();
-  writeFileSync(join(dir, "CLAUDE.md"), "# Projet de test\n\n## Règles\n\n- Règle une.\n- Nouvelle règle bloquante.\n");
+  writeFileSync(
+    join(dir, "CLAUDE.md"),
+    "# Projet de test\n\n## Règles\n\n- Règle une.\n- Nouvelle règle bloquante.\n",
+  );
   const r = lancerPorte(dir);
   assert.equal(r.code, 1);
   const c = controle(r.rapport, "lecture-regles");
@@ -61,14 +64,8 @@ writeFileSync("out/index.html", '<!doctype html><html><body><script>throw new Er
   assert.match(a.detail, /erreur-sortie-build/);
 });
 
-test("3c. les routes profondes sont testées même si la configuration contient seulement /", () => {
-  const dir = projet({
-    regles: {
-      sections_claude_md: ["Règles"],
-      regles: [{ ligne: 5, couverte: true }],
-      routes: ["/"],
-    },
-  });
+test("3c. sans liste « routes », les pages profondes sont détectées et contrôlées", () => {
+  const dir = projet();
   mkdirSync(join(dir, "public", "guides", "niveau", "trois"), { recursive: true });
   writeFileSync(
     join(dir, "public", "guides", "niveau", "trois", "index.html"),
@@ -79,6 +76,36 @@ test("3c. les routes profondes sont testées même si la configuration contient 
   const a = controle(r.rapport, "affichage");
   assert.equal(a.ok, false);
   assert.match(a.detail, /route-profonde-cassee/);
+});
+
+test("3d. une liste « routes » renseignée est explicite : seules ces pages sont contrôlées", () => {
+  const dir = projet({
+    regles: { sections_claude_md: ["Règles"], regles: [{ ligne: 5, couverte: true }], routes: ["/"] },
+  });
+  mkdirSync(join(dir, "public", "cassee"), { recursive: true });
+  writeFileSync(
+    join(dir, "public", "cassee", "index.html"),
+    '<!doctype html><html><body><script>throw new Error("page-hors-liste")</script></body></html>',
+  );
+  const r = lancerPorte(dir);
+  assert.equal(r.code, 0, r.stderr + r.stdout);
+  assert.match(controle(r.rapport, "affichage et adaptation").nom, /\(1 pages/);
+});
+
+test("3e. détection plafonnée : au-delà de 40 pages, le rapport dit combien sont contrôlées et comment en lister", () => {
+  const dir = projet();
+  for (let i = 0; i < 45; i++) {
+    mkdirSync(join(dir, "public", `p${String(i).padStart(2, "0")}`), { recursive: true });
+    writeFileSync(
+      join(dir, "public", `p${String(i).padStart(2, "0")}`, "index.html"),
+      "<!doctype html><p>ok</p>",
+    );
+  }
+  const r = lancerPorte(dir, ["--rapide"]);
+  assert.equal(r.code, 0, r.stderr + r.stdout);
+  const a = controle(r.rapport, "affichage et adaptation");
+  assert.match(a.nom, /\(40 pages/);
+  assert.match(a.detail, /46 pages détectées, 40 contrôlées \(plafond 40\)/);
 });
 
 test("4. erreur JavaScript dans la page : refus du contrôle d'affichage", () => {
@@ -199,6 +226,20 @@ test("15b. test d'acceptation exécuté par le script dédié : accepté", () =>
   assert.equal(controle(r.rapport, "execution-test-acceptation").ok, true);
 });
 
+test("15d. compatibilité : exécuté par test:regles, preuve par le chemin du fichier (sortie type vitest)", () => {
+  const dir = projet({
+    testRegles: "node -e \"console.log('✓ tests/demande.test.mjs (1 test)')\"",
+    git: true,
+  });
+  writeFileSync(join(dir, ".livraison-en-cours"), "0");
+  mkdirSync(join(dir, "tests"), { recursive: true });
+  writeFileSync(join(dir, "tests", "demande.test.mjs"), "// demande:bouton\n");
+  const r = lancerPorte(dir);
+  assert.equal(r.code, 0, r.stderr + r.stdout);
+  assert.equal(controle(r.rapport, "test d'acceptation").ok, true);
+  assert.match(controle(r.rapport, "test d'acceptation").detail, /« test:regles »/);
+});
+
 test("15c. un script test:acceptance qui réussit sans exécuter le test ne suffit pas", () => {
   const dir = projet({ testAcceptance: 'node -e "process.exit(0)"', git: true });
   writeFileSync(join(dir, ".livraison-en-cours"), "0");
@@ -209,7 +250,7 @@ test("15c. un script test:acceptance qui réussit sans exécuter le test ne suff
   const c = controle(r.rapport, "test d'acceptation");
   assert.equal(c.ok, false);
   assert.equal(c.statut, "non_execute");
-  assert.match(c.detail, /n'a pas fourni de preuve d'exécution/);
+  assert.match(c.detail, /ne montre ni l'étiquette ni le fichier/);
 });
 
 test("B. un contrôle « sans objet » ne compte pas dans la fiabilité et n'est pas affiché comme réussi", () => {

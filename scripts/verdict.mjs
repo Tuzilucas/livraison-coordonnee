@@ -49,8 +49,7 @@ export function lireRapport(texte) {
     const r = JSON.parse(String(texte).replace(/^﻿/, ""));
     if (!r || typeof r !== "object" || !Array.isArray(r.controles))
       return { reussi: false, controles: [], invalide: "rapport sans liste de contrôles" };
-    if (r.controles.length === 0)
-      return { ...r, reussi: false, invalide: "rapport sans aucun contrôle" };
+    if (r.controles.length === 0) return { ...r, reussi: false, invalide: "rapport sans aucun contrôle" };
     if (
       !r.controles.every(
         (c) =>
@@ -62,9 +61,15 @@ export function lireRapport(texte) {
       )
     )
       return { ...r, reussi: false, invalide: "rapport contenant un contrôle malformé" };
-    const tousReussis = r.controles.every((c) => c.ok === true && c.statut !== "echoue" && c.statut !== "non_execute");
+    const tousReussis = r.controles.every(
+      (c) => c.ok === true && c.statut !== "echoue" && c.statut !== "non_execute",
+    );
     if (r.reussi === true && !tousReussis)
-      return { ...r, reussi: false, invalide: "rapport incohérent : succès déclaré avec un contrôle en échec" };
+      return {
+        ...r,
+        reussi: false,
+        invalide: "rapport incohérent : succès déclaré avec un contrôle en échec",
+      };
     return { ...r, reussi: r.reussi === true };
   } catch (e) {
     return { reussi: false, controles: [], invalide: "rapport illisible : " + e.message };

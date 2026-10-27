@@ -71,12 +71,12 @@ After an interruption (window closed, context limit), run the same command again
 
 | Check                             | What is verified                                                                                                                                                 |
 | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Rules read                        | `CLAUDE.md` exists and its rules are classified.                                                                                                                 |
+| Rules read                        | `CLAUDE.md` exists, its rules are classified, and the rules file carries the fingerprint of the current `CLAUDE.md` (otherwise: run `regles.mjs` again). |
 | Project checks                    | `npm run check` (or equivalent) passes.                                                                                                                          |
 | Rule coverage                     | Every important rule has a test tagged `regle:<id>`.                                                                                                             |
 | Data                              | Data validation passes, if the project has one.                                                                                                                  |
 | Build                             | `npm run build` passes, if the project has one.                                                                                                                  |
-| Rule and request tests            | `npm run test:regles` passes and the `demande:` test is new or modified during the delivery.                                                                     |
+| Rule and request tests            | `npm run test:regles` passes; the `demande:` test is new or modified during the delivery AND actually run (its output shows the label or the file), by `test:acceptance`, else `test:regles`, else `test`. |
 | End-to-end navigation             | Playwright tests pass, if any.                                                                                                                                   |
 | Forbidden patterns                | No forbidden pattern (secret, internal data) in built files.                                                                                                     |
 | Rendering                         | At 320, 360, 390, 768, 1024 and 1440 px (and dark theme when declared): no horizontal scroll, no off-screen or overlapping text, touch targets of at least 24 px, no JavaScript error. |
@@ -108,7 +108,7 @@ The "No" files are added automatically to the project's `.gitignore`.
 | `LIVRAISON_NAVIGATEUR` | Chrome, then Edge | Force `chrome` or `msedge` for screenshots.         |
 | `LIVRAISON_LANGUE`     | `fr`              | Language of summaries and messages: `fr`, `en`, `es`, `de`, `it`. Otherwise `"langue"` in the rules file (`regles.mjs --langue=xx`). |
 
-Options of `.claude/regles-livraison.json`: `routes` (additional pages to check), `routes_explicites: true` to restrict checks to the listed pages, `largeurs` (widths), `interdits` (forbidden patterns), `controles` and `revue_humaine` (keywords that classify a rule), `theme_sombre`, `interface_web`.
+Options of `.claude/regles-livraison.json`: `routes` (explicit list of pages to check; empty = automatic detection at any depth, capped at 40 pages, the report says so), `largeurs` (widths), `interdits` (forbidden patterns), `controles` and `revue_humaine` (keywords that classify a rule), `theme_sombre`, `interface_web`.
 
 ## 9. Frequently asked questions
 
@@ -132,7 +132,7 @@ Options of `.claude/regles-livraison.json`: `routes` (additional pages to check)
 
 - Tests written by the plugin must be reviewed at first.
 - Rendering checks detect measurable defects (overflow, overlap, small targets), not taste or copy relevance.
-- Automatic page detection stops two folder levels deep; beyond that, list pages in `routes`. An unlisted page is not checked.
+- Automatic page detection is capped at 40 pages (breadth first); beyond that, list the important pages in `routes`. Once `routes` is set, only those pages are checked.
 - Contrast is only measured on solid backgrounds; text over images or gradients is counted "not measurable", never validated.
 - The check browser was exercised in a development environment; Chrome and Edge on workstations remain to be tried widely.
 - Two projects served for validation (a single-file web app and a 900-page Next.js site). A new project needs a first pass to write its rule tests.

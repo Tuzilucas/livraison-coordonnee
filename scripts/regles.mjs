@@ -167,8 +167,8 @@ const sortie = {
   langue: ["fr", "en", "es", "de", "it"].includes(langueArg) ? langueArg : (ancien.langue ?? "fr"),
   controles: ancien.controles ?? [],
   revue_humaine: ancien.revue_humaine ?? [],
+  // Vide = détection automatique des pages (plafonnée) ; renseigné = liste explicite des pages contrôlées.
   routes: ancien.routes ?? [],
-  routes_explicites: ancien.routes_explicites === true,
   largeurs: ancien.largeurs ?? [320, 360, 390, 768, 1024, 1440],
   interdits: ancien.interdits ?? [],
   regles,
