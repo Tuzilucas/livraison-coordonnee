@@ -111,7 +111,8 @@ Le rapport est écrit dans `rapport-livraison/` du projet : `rapport.json` (dét
 
 | Fichier                              | Rôle                                        | À commiter ? |
 | ------------------------------------ | ------------------------------------------- | ------------ |
-| `.claude/regles-livraison.json`      | Règles classées, générées depuis `CLAUDE.md` | Oui          |
+| `.claude/livraison.json`             | Configuration stable, écrite à la main (options ci-dessous) ; prime sur le fichier généré | Oui          |
+| `.claude/regles-livraison.json`      | Règles classées, générées depuis `CLAUDE.md` | Oui (ou non, sur un projet à plusieurs : il porte l'empreinte de `CLAUDE.md` et entre en conflit à chaque fusion ; la commande le regénère) |
 | `.claude/decisions-livraison.json`   | Vos réponses de relecture humaine            | Oui          |
 | `CHOIX.txt`                          | Choix mineurs de la livraison en cours       | Non          |
 | `.livraison-en-cours`                | Marqueur de livraison                        | Non          |
@@ -130,8 +131,10 @@ Les fichiers « Non » sont ajoutés automatiquement au `.gitignore` du projet.
 | `LIVRAISON_NAVIGATEUR`   | Chrome, puis Edge           | Forcer `chrome` ou `msedge` pour les captures.  |
 | `LIVRAISON_LANGUE`       | `fr`                        | Langue des résumés et messages : `fr`, `en`, `es`, `de`, `it`. Sinon `"langue"` du fichier de règles (`regles.mjs --langue=xx`). |
 
-Options de `.claude/regles-livraison.json` : `routes` (liste explicite des pages à contrôler ; vide = détection automatique à toute profondeur, plafonnée à 40 pages, le rapport l'indique), `largeurs`, `interdits`,
-`controles` et `revue_humaine` (mots-clés qui classent une règle), `theme_sombre`.
+Options de `.claude/livraison.json` (ou, à défaut, de `.claude/regles-livraison.json`) : `routes` (liste explicite des pages à contrôler ; vide = détection automatique à toute profondeur, plafonnée à 40 pages, le rapport l'indique), `largeurs`, `interdits`,
+`controles` et `revue_humaine` (mots-clés qui classent une règle), `theme_sombre`, `interface_web`, `langue`.
+
+Sous Windows : Node 20 ou plus dans le `PATH` du processus Claude Code ; pour les contrôles d'affichage, le paquet `playwright` trouvable depuis le projet ou depuis le plugin (par exemple `cd ~/.claude && npm install --no-save playwright`, qui survit aux mises à jour du plugin) et Chrome ou Edge installés, sinon `npx playwright install chromium`.
 
 ## 9. Questions fréquentes
 

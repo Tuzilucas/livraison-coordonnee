@@ -5,6 +5,7 @@
 // Sortie : le code de langue retenu. Un texte trop court ou ambigu garde la langue déjà enregistrée, sinon fr.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { LANGUES, normaliser } from "./langue.mjs";
 
 // Mots très fréquents et discriminants, par langue (minuscules, sans accents retirés : on compare tels quels).
@@ -46,7 +47,9 @@ export function enregistrer(projet, langue) {
   writeFileSync(fichier, JSON.stringify({ ...contenu, langue }, null, 2) + "\n");
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// pathToFileURL : sous Windows, argv[1] est « C:\…\langue-demande.mjs » et import.meta.url « file:///C:/… » ;
+// la comparaison textuelle d'avant n'était jamais vraie, le script ne faisait rien et n'écrivait rien.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const args = process.argv.slice(2);
   const forcee = normaliser((args.find((a) => a.startsWith("--langue=")) ?? "").slice(9));
   const reste = args.filter((a) => !a.startsWith("--"));

@@ -72,7 +72,8 @@ export function lancerPorte(dir, args = [], env = {}) {
     cwd: dir,
     encoding: "utf8",
     env: { ...process.env, ...env },
-    timeout: 120000,
+    // 10 min : le scénario « 45 pages × 3 largeurs » dépasse 2 min sous Windows avec Edge (mesuré 27/10/2026).
+    timeout: 600000,
   });
   const fichier = join(dir, "rapport-livraison", "rapport.json");
   const rapport = existsSync(fichier) ? JSON.parse(readFileSync(fichier, "utf8")) : null;

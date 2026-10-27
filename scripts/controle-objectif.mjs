@@ -4,6 +4,7 @@
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
+import { ouvrirChromium } from "./processus.mjs";
 
 const file = resolve(process.argv[2] ?? "");
 const html = readFileSync(file, "utf8");
@@ -36,9 +37,7 @@ if (!chromium) {
   result.affichage = "non fait (Playwright introuvable)";
 } else {
   try {
-    const browser = await chromium.launch({
-      executablePath: process.env.CHROMIUM_PATH || "/opt/pw-browsers/chromium",
-    });
+    const browser = await ouvrirChromium(chromium);
     const debordements = {};
     for (const width of [320, 390, 768]) {
       const page = await browser.newPage({ viewport: { width, height: 844 } });

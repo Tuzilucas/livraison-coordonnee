@@ -2,8 +2,9 @@
 // Porte de qualité : un livrable n'est accepté que si TOUS les contrôles passent.
 // Usage : node gate.mjs <dossier-du-projet>
 // Sortie : rapport-livraison/rapport.json et rapport-livraison/*.log ; code 0 seulement si tout passe.
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import { lancer, ouvrirChromium } from "./processus.mjs";
 import {
   closeSync,
   existsSync,
@@ -42,7 +43,10 @@ const entreesIgnorees = [
 {
   const fichierIgnore = join(projet, ".gitignore");
   const actuel = existsSync(fichierIgnore) ? readFileSync(fichierIgnore, "utf8") : "";
-  const manquantes = entreesIgnorees.filter((e) => !actuel.split("\n").includes(e));
+  // Fins de ligne Windows (\r\n) : sans les retirer, aucune entrée n'était reconnue et les cinq lignes
+  // étaient rajoutées à chaque passage de la porte.
+  const lignesIgnore = actuel.split(/\r?\n/).map((l) => l.trim());
+  const manquantes = entreesIgnorees.filter((e) => !lignesIgnore.includes(e));
   if (manquantes.length)
     writeFileSync(
       fichierIgnore,
@@ -193,7 +197,8 @@ function environnementEnfant(env = {}, { testsUnitaires = false } = {}) {
   return base;
 }
 function commande(nom, cmd, args, env = {}, options = {}) {
-  const r = spawnSync(cmd, args, {
+  // lancer() : sous Windows, npm et npx sont des .cmd que spawnSync seul ne sait pas lancer (voir processus.mjs).
+  const r = lancer(cmd, args, {
     cwd: projet,
     env: environnementEnfant(env, options),
     encoding: "utf8",
@@ -220,8 +225,9 @@ else {
   regles = lireJson(reglesFile).valeur;
   const norm = (s) => s.trim().toLowerCase();
   const texteClaude = readFileSync(claudeMd, "utf8");
+  // L'empreinte porte sur le texte brut (même calcul que regles.mjs) ; la lecture des titres tolère \r\n.
   const titres = texteClaude
-    .split("\n")
+    .split(/\r?\n/)
     .filter((l) => l.startsWith("## "))
     .map((l) => norm(l.slice(3)));
   const couverts = (regles.sections_claude_md ?? []).map(norm);
@@ -550,11 +556,8 @@ else {
       throw new Error("Playwright introuvable (" + erreurs.join(" ; ") + ")");
     };
     const { chromium } = chargerPlaywright();
-    navigateur = await chromium
-      .launch({
-        executablePath: process.env.CHROMIUM_PATH || "/opt/pw-browsers/chromium",
-      })
-      .catch(() => chromium.launch());
+    // CHROMIUM_PATH, puis le navigateur de Playwright, puis Chrome ou Edge de l'appareil (processus.mjs).
+    navigateur = await ouvrirChromium(chromium);
     const largeurs = rapide ? [320, 390, 1024] : (regles?.largeurs ?? [320, 360, 390, 768, 1024, 1440]);
     // « routes » renseigné = liste explicite des pages contrôlées ; sinon détection automatique, plafonnée.
     const explicites = Array.isArray(regles?.routes) && regles.routes.length > 0;

@@ -7,6 +7,9 @@ import { after, before, test } from "node:test";
 import { demarrer, resoudre } from "../scripts/serveur.mjs";
 
 let racine, dist, serveur, base;
+// Sous Windows, créer un lien symbolique demande un droit (mode développeur ou administrateur) : sans lui, le
+// cas « lien sortant » est sauté et signalé, les autres cas de confinement restent testés.
+let lienCree = false;
 before(async () => {
   racine = mkdtempSync(join(tmpdir(), "livraison-serveur-"));
   dist = join(racine, "out");
@@ -15,7 +18,13 @@ before(async () => {
   writeFileSync(join(dist, "page", "index.html"), "<h1>page</h1>");
   writeFileSync(join(dist, "style.css"), "body{}");
   writeFileSync(join(racine, "secret.txt"), "SECRET-HORS-DOSSIER");
-  symlinkSync(join(racine, "secret.txt"), join(dist, "lien-sortant.txt"));
+  try {
+    symlinkSync(join(racine, "secret.txt"), join(dist, "lien-sortant.txt"));
+    lienCree = true;
+  } catch (e) {
+    if (e.code !== "EPERM") throw e;
+    console.error("lien symbolique impossible sur ce poste (EPERM) : le cas « lien sortant » n'est pas testé ici");
+  }
   ({ serveur, base } = await demarrer(dist).then((s) => ({
     serveur: s.serveur,
     base: s.url,
@@ -54,7 +63,7 @@ test("refuse toute sortie du dossier : « .. », encodages, séparateurs alterna
     "/page/../../secret.txt",
     "/page/..%2f..%2fsecret.txt",
     "/%252e%252e/secret.txt",
-    "/lien-sortant.txt",
+    ...(lienCree ? ["/lien-sortant.txt"] : []),
     "/%00",
   ];
   for (const t of tentatives) {
@@ -71,6 +80,6 @@ test("une URL malformée reçoit une réponse propre, le serveur reste debout", 
 
 test("resoudre() refuse hors périmètre même sans passer par HTTP", () => {
   assert.equal(resoudre(dist, "/../secret.txt"), null);
-  assert.equal(resoudre(dist, "/lien-sortant.txt"), null);
+  if (lienCree) assert.equal(resoudre(dist, "/lien-sortant.txt"), null);
   assert.ok(resoudre(dist, "/page/").endsWith(join("page", "index.html")));
 });

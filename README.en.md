@@ -11,7 +11,7 @@ git clone https://github.com/Tuzilucas/livraison-coordonnee ~/tools/livraison-co
 cd /path/to/my-project && claude --plugin-dir ~/tools/livraison-coordonnee
 ```
 
-Then, inside Claude Code: `/livraison-coordonnee:livrer <your request>`. Step-by-step guide: [`NOTICE.en.md`](NOTICE.en.md). Contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md). MIT license. Version 1.6.1.
+Then, inside Claude Code: `/livraison-coordonnee:livrer <your request>`. Step-by-step guide: [`NOTICE.en.md`](NOTICE.en.md). Contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md). MIT license. Version 1.6.2.
 
 Validated on two real projects: a single-file web app (37 of 37 rules covered by a test) and a 900-page Next.js site (gate 9/9, merged and published). The engine has its own test suite (`npm test`) and a CI on every push and pull request.
 
@@ -57,6 +57,12 @@ The code, check names and technical report are in French. Summaries (`RESUME.txt
 - `controles`, `revue_humaine`: keywords that classify a rule;
 - `interface_web: false`: a project without pages (rendering checks become not applicable).
 
+These options may also live in **`.claude/livraison.json`**, a stable hand-written file that takes precedence over the generated one. On a shared project this is the file to commit: the generated file carries the `CLAUDE.md` fingerprint and would change at every merge. `regles.mjs` re-reads this configuration at every generation.
+
+## Windows
+
+The plugin runs on Windows since 1.6.2 (Node 20 or newer). Rendering checks use, in order, `CHROMIUM_PATH`, the browser installed by Playwright (`npx playwright install chromium`), then Chrome or Edge found on the machine: with Edge, nothing to download. The `playwright` package must be resolvable from the project or from the plugin; installed once in a parent folder of the plugin cache (`cd ~/.claude && npm install --no-save playwright`) it survives plugin updates. The stop hook and the MCP server start `node` by name: it must be on the `PATH` of the Claude Code process.
+
 ## Strengths
 
 - **Catches real defects**: overlapping text, touch targets too small, horizontal overflow, a build crash after a merge, none of which review alone had seen.
@@ -89,6 +95,7 @@ The code, check names and technical report are in French. Summaries (`RESUME.txt
 
 See the French `README.md` for the full history. Highlights:
 
+- 1.6.2: Windows and shared-project compatibility, measured on a Windows 11 workstation (Node 24) with a Maven project. `scripts/processus.mjs`: portable launch of `npm`/`npx` (`.cmd` scripts that `spawnSync` alone could not start: the gate could run no project script at all) and Chromium opened through `CHROMIUM_PATH`, Playwright's own browser, then Chrome or Edge on the machine. Windows line endings (`\r\n`): a `CLAUDE.md` written on Windows yielded **zero rules** and a green gate that checked nothing; a `.gitignore` in `\r\n` received the five entries at every run. `langue-demande.mjs` never ran on Windows (file URL comparison). `regles.mjs` keeps `interface_web` and `theme_sombre` across generations (previously erased) and reads `.claude/livraison.json`, a stable, committable configuration that takes precedence over the generated file. `verifier-environnement` finds npm on Windows and reports Playwright and Chromium as not applicable for a project without a web interface. Server confinement test: the symlink case is skipped when the workstation cannot create one. 54 tests.
 - 1.6.1: reliability audit (PR #1). Gate report refused when empty, malformed or inconsistent; rules file refused without the current `CLAUDE.md` fingerprint; `npm test` run when present; acceptance test run by `test:acceptance`, else `test:regles`, else `test`, with execution proof required in the output; visual checks on the real build output; routes: explicit list when set, else capped auto-detection; atomic lock; unit-test runners run with `CI=1` (never the build nor Playwright) and child commands without Node test-runner variables; GitHub Actions CI on Node 20 and 22 with Chromium.
 - 1.6.0: the `livrer` command detects the request's language and runs in it; summaries and messages in five languages (`LIVRAISON_LANGUE`, `--langue=xx`, `langue` in the rules file); English command `/livraison-coordonnee:deliver`. Stop hook aligned with the Claude Code documentation: reads `stop_hook_active`, gives up early when the same failures recur three times in a row during a continuation (Claude Code itself caps at eight consecutive continuations without a tool call, `CLAUDE_CODE_STOP_HOOK_BLOCK_CAP`), JSON marker (attempts, no-progress count, failure fingerprint; old numeric format accepted). 39 tests.
 - 1.5.0: technical audit. Static server confined to the build folder (real path resolution, symlinks and encodings refused), local interface and system-chosen port. Explicit check statuses; a project with no verification mechanism never gets a green gate; during a delivery the acceptance test must be run by a script, not merely exist; `interface_web: false` for projects without pages. Safe JSON reads, invalid forbidden patterns diagnosed, internal crash turned into a failure report. Lock against two concurrent gates. Browser always closed. Fast mode rebuilds when a dependency, lockfile, config or `.env` changed. Stop hook: `LIVRAISON_ESSAIS` bounded (1-50), unreadable marker tolerated, missing or malformed report treated as failure, exhaustion recorded as `terminee: false` with a system message. Engine test suite on temporary projects (28 tests).

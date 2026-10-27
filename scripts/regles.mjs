@@ -17,13 +17,28 @@ const langueArg = (argsRegles.find((a) => a.startsWith("--langue=")) ?? "")
   .trim()
   .toLowerCase()
   .slice(0, 2);
+// L'empreinte (source_sha256) est calculée sur le texte brut ; la lecture des lignes tolère les fins de ligne
+// Windows (\r\n) : sans ça, « (.*)$ » ne reconnaissait aucune puce d'un CLAUDE.md écrit sous Windows, et la
+// porte passait au vert avec zéro règle.
 const texte = readFileSync(join(projet, "CLAUDE.md"), "utf8");
-// Configuration propre au projet, conservée dans .claude/regles-livraison.json :
+const lignes = texte.split(/\r?\n/);
+// Configuration propre au projet :
 //   controles : [{ id, motif, bloquant? }] ajoutés avant les contrôles génériques (motif = expression régulière) ;
-//   revue_humaine : [motif] règles à classer en revue humaine (motif = expression régulière).
-const ancien = existsSync(join(projet, ".claude", "regles-livraison.json"))
-  ? JSON.parse(readFileSync(join(projet, ".claude", "regles-livraison.json"), "utf8"))
-  : {};
+//   revue_humaine : [motif] règles à classer en revue humaine (motif = expression régulière) ;
+//   routes, largeurs, interdits, interface_web, langue : options de la porte.
+// Elle se lit dans .claude/regles-livraison.json (fichier généré) et, en priorité, dans .claude/livraison.json :
+// un fichier STABLE, écrit à la main et versionné, qui ne change pas à chaque modification de CLAUDE.md. Sur un
+// projet à plusieurs, le fichier généré (empreinte de CLAUDE.md) entre en conflit à chaque fusion ; la
+// configuration, elle, doit survivre et peut rester seule sous Git.
+const lireConfig = (fichier) => {
+  if (!existsSync(fichier)) return {};
+  const v = JSON.parse(readFileSync(fichier, "utf8").replace(/^﻿/, ""));
+  return v && typeof v === "object" && !Array.isArray(v) ? v : {};
+};
+const ancien = {
+  ...lireConfig(join(projet, ".claude", "regles-livraison.json")),
+  ...lireConfig(join(projet, ".claude", "livraison.json")),
+};
 const slug = (s) =>
   s
     .normalize("NFD")
@@ -98,12 +113,11 @@ const controlesDuProjet = (ancien.controles ?? []).map((c) => ({
 const regles = [];
 const revueDuProjet = (ancien.revue_humaine ?? []).map((m) => new RegExp(m, "i"));
 // Toutes les sections « ## » de CLAUDE.md, même sans puce : la porte les contrôle toutes.
-const titresDeSections = texte
-  .split("\n")
+const titresDeSections = lignes
   .filter((l) => l.startsWith("## "))
   .map((l) => l.slice(3).trim());
 let section = "";
-texte.split("\n").forEach((ligne, i) => {
+lignes.forEach((ligne, i) => {
   if (ligne.startsWith("## ")) section = ligne.slice(3).trim();
   const puce = ligne.match(/^\s*(?:-|\d+\.)\s+(.*)$/);
   if (!puce || !section) return;
@@ -171,6 +185,10 @@ const sortie = {
   routes: ancien.routes ?? [],
   largeurs: ancien.largeurs ?? [320, 360, 390, 768, 1024, 1440],
   interdits: ancien.interdits ?? [],
+  // Conservé explicitement : avant, chaque régénération effaçait « interface_web: false » et la porte réclamait
+  // un dossier servi à un projet qui n'a pas de pages.
+  interface_web: ancien.interface_web !== false,
+  ...(ancien.theme_sombre === undefined ? {} : { theme_sombre: ancien.theme_sombre }),
   regles,
   non_couvertes: nonCouvertes,
   revues_humaines: regles.filter((r) => !r.bloquante).map((r) => `${r.id} (ligne ${r.ligne})`),
