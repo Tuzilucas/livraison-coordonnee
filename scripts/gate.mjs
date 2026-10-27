@@ -253,9 +253,9 @@ function routesDetectees(racine) {
   parcourir(racine, 0, "/");
   return routes.length ? routes : ["/"];
 }
-const dist = racineServie();
+let dist = racineServie();
 // Thème sombre : contrôlé seulement si le site déclare un mécanisme de thème (sinon il n'y a rien à vérifier).
-const aThemeSombre =
+let aThemeSombre =
   Boolean(dist) && /prefers-color-scheme|data-theme/.test(readFileSync(join(dist, "index.html"), "utf8"));
 
 if (scripts.check) commande("verification-projet", "npm", ["run", "check"]);
@@ -350,6 +350,11 @@ if (!scripts.build) {
     NEXT_PUBLIC_BASE_PATH: "",
   });
 }
+// Le build peut créer ou remplacer le dossier servi : les contrôles visuels doivent viser sa sortie réelle.
+dist = racineServie();
+aThemeSombre =
+  Boolean(dist) && /prefers-color-scheme|data-theme/.test(readFileSync(join(dist, "index.html"), "utf8"));
+
 if (scripts.test) commande("tests-projet", "npm", ["test"]);
 if (scripts["test:regles"]) commande("tests-des-regles", "npm", ["run", "test:regles"]);
 // Demande : pendant une livraison, il faut un test d'acceptation étiqueté « demande:<nom> » qui prouve que la demande est remplie.
