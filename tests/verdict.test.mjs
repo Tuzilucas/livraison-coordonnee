@@ -33,7 +33,17 @@ test("porte réussie (code 0 et rapport « reussi ») : livraison terminée, mar
 });
 
 test("rapport absent ou malformé : jamais un succès, même avec un code 0", () => {
-  for (const texte of [null, "", "{", JSON.stringify({ reussi: true }), JSON.stringify([1])]) {
+  for (const texte of [
+    null,
+    "",
+    "{",
+    JSON.stringify({ reussi: true }),
+    JSON.stringify({ reussi: true, controles: [] }),
+    JSON.stringify({ reussi: true, controles: [{ nom: "x", ok: false }] }),
+    JSON.stringify({ reussi: true, controles: [{ nom: "x", ok: true, statut: "non_execute" }] }),
+    JSON.stringify({ reussi: true, controles: [{ nom: "", ok: true }] }),
+    JSON.stringify([1]),
+  ]) {
     const r = lireRapport(texte);
     assert.equal(r.reussi, false);
     assert.ok(r.invalide, `rapport ${JSON.stringify(texte)} devrait être marqué invalide`);
