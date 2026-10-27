@@ -1,4 +1,4 @@
-# User guide — `livraison-coordonnee` plugin (version 1.6.0)
+# User guide — `livraison-coordonnee` plugin (version 1.6.1)
 
 _Translation of [`NOTICE.md`](NOTICE.md); the French version is authoritative._
 
@@ -139,7 +139,7 @@ Options of `.claude/regles-livraison.json`: `routes` (pages to check), `largeurs
 
 ## 11. Testing the plugin itself
 
-`npm test` in the plugin folder runs 39 tests on temporary projects (created in the system temp folder, removed afterwards): valid project, failing test or build, JavaScript error, invalid configuration, missing or malformed `package.json`, two concurrent gates, directory traversal, missing or corrupted reports, exhausted attempts, project without tests, stale build in fast mode, project without a web interface, uncovered rule, acceptance test not run. Chromium and Playwright are required for the rendering scenarios.
+`npm test` in the plugin folder runs the test suite on temporary projects (created in the system temp folder, removed afterwards): valid project, failing test or build, JavaScript error, invalid configuration, missing or malformed `package.json`, two concurrent gates, directory traversal, missing or corrupted reports, exhausted attempts, project without tests, stale build in fast mode, project without a web interface, uncovered rule, acceptance test not run. Chromium and Playwright are required for the rendering scenarios.
 
 ## 12. Going further
 
