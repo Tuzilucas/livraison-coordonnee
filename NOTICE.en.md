@@ -108,7 +108,7 @@ The "No" files are added automatically to the project's `.gitignore`.
 | `LIVRAISON_NAVIGATEUR` | Chrome, then Edge | Force `chrome` or `msedge` for screenshots.         |
 | `LIVRAISON_LANGUE`     | `fr`              | Language of summaries and messages: `fr`, `en`, `es`, `de`, `it`. Otherwise `"langue"` in the rules file (`regles.mjs --langue=xx`). |
 
-Options of `.claude/regles-livraison.json`: `routes` (pages to check), `largeurs` (widths), `interdits` (forbidden patterns), `controles` and `revue_humaine` (keywords that classify a rule), `theme_sombre`, `interface_web`.
+Options of `.claude/regles-livraison.json`: `routes` (additional pages to check), `routes_explicites: true` to restrict checks to the listed pages, `largeurs` (widths), `interdits` (forbidden patterns), `controles` and `revue_humaine` (keywords that classify a rule), `theme_sombre`, `interface_web`.
 
 ## 9. Frequently asked questions
 
