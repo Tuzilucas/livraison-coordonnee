@@ -61,6 +61,26 @@ writeFileSync("out/index.html", '<!doctype html><html><body><script>throw new Er
   assert.match(a.detail, /erreur-sortie-build/);
 });
 
+test("3c. les routes profondes sont testées même si la configuration contient seulement /", () => {
+  const dir = projet({
+    regles: {
+      sections_claude_md: ["Règles"],
+      regles: [{ ligne: 5, couverte: true }],
+      routes: ["/"],
+    },
+  });
+  mkdirSync(join(dir, "public", "guides", "niveau", "trois"), { recursive: true });
+  writeFileSync(
+    join(dir, "public", "guides", "niveau", "trois", "index.html"),
+    '<!doctype html><html><body><script>throw new Error("route-profonde-cassee")</script></body></html>',
+  );
+  const r = lancerPorte(dir);
+  assert.equal(r.code, 1);
+  const a = controle(r.rapport, "affichage");
+  assert.equal(a.ok, false);
+  assert.match(a.detail, /route-profonde-cassee/);
+});
+
 test("4. erreur JavaScript dans la page : refus du contrôle d'affichage", () => {
   const r = lancerPorte(projet({ script: "<script>throw new Error('cassé')</script>" }));
   assert.equal(r.code, 1);
