@@ -23,7 +23,9 @@ before(async () => {
     lienCree = true;
   } catch (e) {
     if (e.code !== "EPERM") throw e;
-    console.error("lien symbolique impossible sur ce poste (EPERM) : le cas « lien sortant » n'est pas testé ici");
+    console.error(
+      "lien symbolique impossible sur ce poste (EPERM) : le cas « lien sortant » n'est pas testé ici",
+    );
   }
   ({ serveur, base } = await demarrer(dist).then((s) => ({
     serveur: s.serveur,

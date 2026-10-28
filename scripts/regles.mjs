@@ -113,9 +113,7 @@ const controlesDuProjet = (ancien.controles ?? []).map((c) => ({
 const regles = [];
 const revueDuProjet = (ancien.revue_humaine ?? []).map((m) => new RegExp(m, "i"));
 // Toutes les sections « ## » de CLAUDE.md, même sans puce : la porte les contrôle toutes.
-const titresDeSections = lignes
-  .filter((l) => l.startsWith("## "))
-  .map((l) => l.slice(3).trim());
+const titresDeSections = lignes.filter((l) => l.startsWith("## ")).map((l) => l.slice(3).trim());
 let section = "";
 lignes.forEach((ligne, i) => {
   if (ligne.startsWith("## ")) section = ligne.slice(3).trim();
