@@ -122,6 +122,8 @@ Options of `.claude/regles-livraison.json`: `routes` (explicit list of pages to 
 
 **The gate is going in circles.** If, during a continuation (Claude Code reports `stop_hook_active`), the same failures recur three times in a row, the hook gives up before the fifth attempt, flagged "no progress". Claude Code itself caps at eight consecutive continuations without a tool call (`CLAUDE_CODE_STOP_HOOK_BLOCK_CAP`).
 
+**Can an old green report let a delivery through?** No. The hook always re-runs the gate, which deletes the previous report before writing its own; and it refuses any report dated before its own launch (a report from an earlier revision counts as a missing report). Both cases are tested end to end.
+
 **The attempts are exhausted, what happens?** The marker is removed so Claude can stop, but the delivery is recorded as **not finished**: `.livraison-etat.json` contains `"terminee": false`, the log notes it, and a system message shows it. Running the command again resumes from that state.
 
 **Is the check server exposed?** No: it listens only on `127.0.0.1`, on a free port chosen by the system, and serves only the files of the build folder (any path leaving it is refused).

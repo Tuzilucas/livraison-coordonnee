@@ -42,7 +42,12 @@ export function lireMarqueur(texte) {
 }
 
 /** Lit un rapport de porte ; un rapport absent ou malformé est un échec explicite, jamais un succès. */
-export function lireRapport(texte) {
+/**
+ * @param {string|null} texte  contenu de rapport.json
+ * @param {{ depuis?: number }} options  depuis : instant (ms) du lancement de la porte ; un rapport daté d'avant
+ *   est un rapport d'une exécution antérieure (d'autres fichiers, d'autres résultats) et ne prouve rien.
+ */
+export function lireRapport(texte, { depuis } = {}) {
   if (texte === null || texte === undefined)
     return { reussi: false, controles: [], invalide: "rapport absent" };
   try {
@@ -64,6 +69,16 @@ export function lireRapport(texte) {
     const tousReussis = r.controles.every(
       (c) => c.ok === true && c.statut !== "echoue" && c.statut !== "non_execute",
     );
+    if (typeof depuis === "number") {
+      const date = Date.parse(r.date ?? "");
+      // Tolérance d'une seconde : l'horloge du rapport est celle du même processus, mais arrondie.
+      if (!Number.isFinite(date) || date < depuis - 1000)
+        return {
+          ...r,
+          reussi: false,
+          invalide: `rapport antérieur à cette exécution (${r.date ?? "sans date"}) : il ne prouve rien sur les fichiers actuels`,
+        };
+    }
     if (r.reussi === true && !tousReussis)
       return {
         ...r,
