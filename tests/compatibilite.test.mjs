@@ -31,7 +31,11 @@ test("W1. un CLAUDE.md aux fins de ligne Windows (\\r\\n) donne les mêmes règl
   assert.equal(regles.regles[0].texte, "Règle une.", "pas de \\r en fin de texte");
   // La porte lit les mêmes titres et accepte l'empreinte calculée sur le texte brut.
   const porte = lancerPorte(dir);
-  assert.equal(controle(porte.rapport, "lecture-regles").ok, true, controle(porte.rapport, "lecture-regles").detail);
+  assert.equal(
+    controle(porte.rapport, "lecture-regles").ok,
+    true,
+    controle(porte.rapport, "lecture-regles").detail,
+  );
 });
 
 test("W2. un .gitignore en \\r\\n qui contient déjà les entrées n'est pas réécrit à chaque passage", () => {
@@ -56,7 +60,9 @@ test("W4. ligneDeCommande() cite les arguments qui en ont besoin", () => {
 });
 
 test("W5. regles.mjs conserve interface_web et theme_sombre d'une génération à l'autre", () => {
-  const dir = projet({ regles: { sections_claude_md: ["Règles"], regles: [], interface_web: false, theme_sombre: true } });
+  const dir = projet({
+    regles: { sections_claude_md: ["Règles"], regles: [], interface_web: false, theme_sombre: true },
+  });
   assert.equal(lancerRegles(dir).status, 0);
   const regles = lireRegles(dir);
   assert.equal(regles.interface_web, false, "effacé à chaque régénération avant le correctif");
@@ -80,7 +86,10 @@ test("W6. .claude/livraison.json (configuration stable, versionnable) prime sur 
       revue_humaine: ["^Principe"],
     }),
   );
-  writeFileSync(join(dir, "CLAUDE.md"), "# Projet\n\n## Règles\n\n- Principe général.\n- Libellé en portugais.\n");
+  writeFileSync(
+    join(dir, "CLAUDE.md"),
+    "# Projet\n\n## Règles\n\n- Principe général.\n- Libellé en portugais.\n",
+  );
   mkdirSync(join(dir, "tests"), { recursive: true });
   writeFileSync(join(dir, "tests", "regles.test.mjs"), "// regle:regles-libelle-en-portugais\n");
   const r = lancerRegles(dir);

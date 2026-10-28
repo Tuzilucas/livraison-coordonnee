@@ -97,7 +97,9 @@ export async function ouvrirChromium(chromium, options = {}) {
     try {
       return await chromium.launch({ ...options, ...essai });
     } catch (e) {
-      erreurs.push(`${essai.executablePath ?? "navigateur de Playwright"} : ${String(e.message).split("\n")[0]}`);
+      erreurs.push(
+        `${essai.executablePath ?? "navigateur de Playwright"} : ${String(e.message).split("\n")[0]}`,
+      );
     }
   }
   throw new Error("aucun Chromium, Chrome ou Edge ne s'ouvre (" + erreurs.join(" ; ") + ")");

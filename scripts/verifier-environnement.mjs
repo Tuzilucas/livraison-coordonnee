@@ -14,7 +14,9 @@ const major = Number(process.versions.node.split(".")[0]);
 major >= 20 ? ok("Node.js", process.versions.node) : ko("Node.js", "installer Node.js 20 ou plus récent");
 // lancer() : sous Windows, npm est un .cmd que spawnSync seul ne trouve pas (ENOENT) — faux « manque ».
 const npm = lancer("npm", ["--version"], { encoding: "utf8" });
-npm.status === 0 ? ok("npm", String(npm.stdout).trim()) : ko("npm", "npm est nécessaire (il doit être dans le PATH)");
+npm.status === 0
+  ? ok("npm", String(npm.stdout).trim())
+  : ko("npm", "npm est nécessaire (il doit être dans le PATH)");
 existsSync(join(projet, "package.json"))
   ? ok("package.json du projet")
   : ko("package.json", "le projet doit avoir un package.json");
