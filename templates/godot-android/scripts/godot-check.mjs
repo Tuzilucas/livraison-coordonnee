@@ -60,8 +60,8 @@ if (mode === "--check") {
     process.exit(2);
   }
   const presetText = readFileSync(presetFile, "utf8");
-  if (!/\[preset\.\d+\]/.test(presetText) || !/platform\s*=\s*"Android"/.test(presetText)) {
-    console.error('Aucun preset d\'export Android détecté dans export_presets.cfg.');
+  if (!/\[preset\.\d+\]/.test(presetText) || !/name\s*=\s*"Android"/.test(presetText) || !/platform\s*=\s*"Android"/.test(presetText)) {
+    console.error('Le preset nommé Android est absent ou sa plateforme n'est pas Android.');
     process.exit(2);
   }
   const output = resolve(root, "build/android/game.apk");
