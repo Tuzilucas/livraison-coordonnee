@@ -36,6 +36,9 @@ journal(
 );
 
 const gate = join(import.meta.dirname, "gate.mjs");
+// Instant du lancement : seul un rapport écrit après compte. Un rapport d'une exécution antérieure, même tout vert,
+// ne prouve rien sur les fichiers actuels et est refusé comme un rapport absent.
+const lancement = Date.now();
 const r = spawnSync(process.execPath, [gate, projet], {
   cwd: projet,
   encoding: "utf8",
@@ -45,7 +48,9 @@ const r = spawnSync(process.execPath, [gate, projet], {
 if (r.error) journal(projet, `verdict : la porte n'a pas pu être exécutée (${r.error.message})`);
 
 const fichierRapport = join(projet, "rapport-livraison", "rapport.json");
-const rapport = lireRapport(existsSync(fichierRapport) ? readFileSync(fichierRapport, "utf8") : null);
+const rapport = lireRapport(existsSync(fichierRapport) ? readFileSync(fichierRapport, "utf8") : null, {
+  depuis: lancement,
+});
 const marqueur = lireMarqueur(existsSync(marqueurFichier) ? readFileSync(marqueurFichier, "utf8") : "");
 const verdict = decider({
   codeGate: r.status,

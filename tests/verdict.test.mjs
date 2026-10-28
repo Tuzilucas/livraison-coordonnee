@@ -91,3 +91,24 @@ test("un LIVRAISON_ESSAIS négatif ne permet pas d'abandonner dès le premier é
   assert.equal(v.decision, "bloquer");
   assert.equal(v.essaisMax, 5);
 });
+
+test("rapport d'une exécution antérieure : refusé même s'il est tout vert", () => {
+  const hier = new Date(Date.now() - 86_400_000).toISOString();
+  const texte = JSON.stringify({ date: hier, reussi: true, controles: [{ nom: "x", ok: true }] });
+  const r = lireRapport(texte, { depuis: Date.now() });
+  assert.equal(r.reussi, false);
+  assert.match(r.invalide, /antérieur à cette exécution/);
+  assert.equal(decider({ codeGate: 0, rapport: r, tentativesPrecedentes: 0 }).decision, "bloquer");
+  // Sans date du tout : refusé aussi. Daté de maintenant : accepté. Sans « depuis » : comportement inchangé.
+  assert.ok(
+    lireRapport(JSON.stringify({ reussi: true, controles: [{ nom: "x", ok: true }] }), { depuis: Date.now() })
+      .invalide,
+  );
+  const maintenant = JSON.stringify({
+    date: new Date().toISOString(),
+    reussi: true,
+    controles: [{ nom: "x", ok: true }],
+  });
+  assert.equal(lireRapport(maintenant, { depuis: Date.now() - 5000 }).reussi, true);
+  assert.equal(lireRapport(texte).reussi, true);
+});

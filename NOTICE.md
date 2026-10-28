@@ -156,6 +156,10 @@ vert. C'est la principale limite connue.
 « sans progrès ». Claude Code plafonne lui-même à huit continuations consécutives sans appel d'outil
 (`CLAUDE_CODE_STOP_HOOK_BLOCK_CAP`).
 
+**Un vieux rapport vert peut-il faire passer une livraison ?** Non. Le hook relance toujours la porte, qui
+efface le rapport précédent avant d'écrire le sien ; et il refuse tout rapport daté d'avant son propre lancement
+(rapport d'une révision antérieure = rapport absent). Les deux cas sont testés de bout en bout.
+
 **Les essais sont épuisés, que se passe-t-il ?** Le marqueur est retiré pour que Claude puisse s'arrêter,
 mais la livraison est consignée comme **non terminée** : `.livraison-etat.json` contient `"terminee": false`,
 le journal le note, et un message système l'affiche. Relancer la commande reprend à cet état.
