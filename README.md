@@ -119,3 +119,8 @@ Le plugin fonctionne sous Windows depuis la 1.6.2 (Node 20 ou plus). Les contrô
 - 0.1.0 : premier prototype, trois experts, grille de notation.
 
 Les dossiers `agents/`, `grille/` et `scripts/verifier-notes.mjs` datent des versions 0.x (relecture par experts notés) ; ils ne font plus partie du procédé depuis la 0.8.0 et sont conservés pour mémoire.
+
+
+## Profil Godot 4 / Android
+
+Un profil de démarrage pour les jeux Godot 4 exportés sur Android est disponible dans [`docs/GODOT-ANDROID.md`](docs/GODOT-ANDROID.md), avec des lanceurs et des tests modèles dans [`templates/godot-android/`](templates/godot-android/). Il vérifie le projet en mode headless, exige un runner de tests et un test d'acceptation propre à la demande, puis tente de produire un APK Android. Les tests modèles ne prouvent pas la qualité du jeu tant qu'ils n'ont pas été remplacés par de vrais tests.

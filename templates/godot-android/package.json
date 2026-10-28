@@ -1,0 +1,12 @@
+{
+  "name": "godot-android-project",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Lanceurs de contrôles Livraison Coordonnée pour un projet Godot 4 Android",
+  "scripts": {
+    "check": "node scripts/godot-check.mjs --check",
+    "test": "node scripts/godot-check.mjs --test",
+    "test:acceptance": "node scripts/godot-check.mjs --acceptance",
+    "build": "node scripts/godot-check.mjs --export"
+  }
+}
